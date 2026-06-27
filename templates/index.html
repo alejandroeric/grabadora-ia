@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1020" />
+  <title>NotaIA · Grabá tu clase, charlá con la IA</title>
+
+  <!-- Tailwind por CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+        },
+      },
+    };
+  </script>
+
+  <!-- Tipografía -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    :root { color-scheme: dark; }
+    html, body { background: #0b1020; }
+
+    /* Orbes de fondo animados (gradiente indigo-purple-pink) */
+    .orb { position: fixed; border-radius: 9999px; filter: blur(90px); opacity: .45; z-index: 0; pointer-events: none; animation: float 14s ease-in-out infinite; }
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(20px, -30px) scale(1.1); }
+    }
+
+    /* Texto con gradiente */
+    .grad-text {
+      background: linear-gradient(110deg, #818cf8 0%, #c084fc 45%, #f472b6 100%);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .grad-bg { background-image: linear-gradient(110deg, #6366f1 0%, #a855f7 50%, #ec4899 100%); }
+
+    /* Tarjetas glass */
+    .glass { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); backdrop-filter: blur(12px); }
+
+    /* Anillos pulsantes del botón de grabar */
+    .rec-pulse::before, .rec-pulse::after {
+      content: ""; position: absolute; inset: 0; border-radius: 9999px;
+      border: 2px solid rgba(236,72,153,.6); animation: ring 1.8s ease-out infinite;
+    }
+    .rec-pulse::after { animation-delay: .9s; }
+    @keyframes ring {
+      0% { transform: scale(1); opacity: .7; }
+      100% { transform: scale(1.8); opacity: 0; }
+    }
+
+    .fade-in { animation: fade .4s ease both; }
+    @keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+    /* Scrollbar discreto */
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 9999px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+
+    .typing span { display:inline-block; width:7px; height:7px; margin:0 1px; border-radius:9999px; background:#c084fc; animation: blink 1.2s infinite both; }
+    .typing span:nth-child(2){ animation-delay:.2s } .typing span:nth-child(3){ animation-delay:.4s }
+    @keyframes blink { 0%,80%,100%{ opacity:.2; transform:translateY(0) } 40%{ opacity:1; transform:translateY(-3px) } }
+  </style>
+</head>
+
+<body class="font-sans text-slate-100 antialiased min-h-screen relative overflow-x-hidden">
+  <!-- Fondo -->
+  <div class="orb" style="width:380px;height:380px;background:#6366f1;top:-80px;left:-60px;"></div>
+  <div class="orb" style="width:320px;height:320px;background:#ec4899;bottom:-100px;right:-40px;animation-delay:-5s;"></div>
+  <div class="orb" style="width:300px;height:300px;background:#a855f7;top:40%;left:55%;animation-delay:-9s;"></div>
+
+  <div class="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 pb-24">
+
+    <!-- Header -->
+    <header class="flex items-center justify-between py-6">
+      <div class="flex items-center gap-3">
+        <div class="h-11 w-11 rounded-2xl grad-bg grid place-items-center shadow-lg shadow-purple-900/40">
+          <svg class="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+        </div>
+        <div>
+          <h1 class="text-xl font-extrabold tracking-tight">Nota<span class="grad-text">IA</span></h1>
+          <p class="text-xs text-slate-400 -mt-0.5">Grabá tu clase · charlá con la IA</p>
+        </div>
+      </div>
+      <button id="open-sessions" class="glass hover:bg-white/10 transition rounded-xl px-4 py-2 text-sm font-medium flex items-center gap-2">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18M3 12h18M3 17h18"/></svg>
+        Mis sesiones
+      </button>
+    </header>
+
+    <!-- Aviso de navegador sin soporte -->
+    <div id="browser-warning" class="hidden glass border-amber-500/30 bg-amber-500/10 rounded-2xl px-5 py-4 mb-6 text-sm text-amber-200">
+      Tu navegador no soporta reconocimiento de voz. Usá <strong>Google Chrome</strong> en compu o celular para grabar.
+    </div>
+
+    <!-- Hero / Grabadora -->
+    <section class="glass rounded-3xl p-8 sm:p-10 text-center mb-6 fade-in">
+      <h2 class="text-2xl sm:text-3xl font-extrabold leading-tight">
+        Convertí tu clase en <span class="grad-text">notas inteligentes</span>
+      </h2>
+      <p class="text-slate-400 mt-2 max-w-xl mx-auto text-sm sm:text-base">
+        Grabá, mirá la transcripción en vivo y después preguntale a Claude lo que quieras sobre lo que se dijo.
+      </p>
+
+      <!-- Botón de grabar -->
+      <div class="mt-8 flex flex-col items-center gap-3">
+        <button id="record-btn" class="relative h-24 w-24 rounded-full grad-bg grid place-items-center shadow-xl shadow-purple-900/50 transition hover:scale-105 active:scale-95">
+          <span id="record-icon">
+            <svg class="h-9 w-9 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+          </span>
+        </button>
+        <div class="flex items-center gap-2 text-sm">
+          <span id="status-dot" class="h-2.5 w-2.5 rounded-full bg-slate-500"></span>
+          <span id="status-text" class="text-slate-300 font-medium">Listo para grabar</span>
+        </div>
+        <div id="timer" class="font-mono text-2xl font-bold tracking-widest text-slate-200 tabular-nums">00:00</div>
+      </div>
+    </section>
+
+    <!-- Grilla: Transcript + Chat -->
+    <div class="grid lg:grid-cols-2 gap-6">
+
+      <!-- Transcript -->
+      <section class="glass rounded-3xl p-6 flex flex-col min-h-[420px]">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-bold flex items-center gap-2">
+            <svg class="h-5 w-5 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            Transcripción
+          </h3>
+          <button id="copy-transcript" class="text-xs text-slate-400 hover:text-white transition hidden">Copiar</button>
+        </div>
+        <div id="transcript-box" class="flex-1 overflow-y-auto rounded-2xl bg-black/20 p-4 text-sm leading-relaxed text-slate-200 whitespace-pre-wrap">
+          <p id="transcript-empty" class="text-slate-500 text-center mt-16">
+            Tocá el micrófono y empezá a hablar.<br/>El texto va a aparecer acá en tiempo real.
+          </p>
+          <span id="transcript-final"></span><span id="transcript-interim" class="text-slate-400 italic"></span>
+        </div>
+
+        <!-- Acciones: guardar / descartar -->
+        <div id="actions" class="hidden mt-4 grid grid-cols-2 gap-3 fade-in">
+          <button id="save-btn" class="grad-bg hover:opacity-90 transition rounded-xl py-3 font-semibold flex items-center justify-center gap-2">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Guardar sesión
+          </button>
+          <button id="discard-btn" class="glass hover:bg-white/10 transition rounded-xl py-3 font-semibold flex items-center justify-center gap-2 text-slate-300">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Descartar
+          </button>
+        </div>
+      </section>
+
+      <!-- Chat -->
+      <section class="glass rounded-3xl p-6 flex flex-col min-h-[420px]">
+        <h3 class="font-bold flex items-center gap-2 mb-4">
+          <svg class="h-5 w-5 text-pink-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Charlá con Claude
+        </h3>
+
+        <div id="chat-messages" class="flex-1 overflow-y-auto space-y-3 pr-1">
+          <div id="chat-empty" class="text-center text-slate-500 mt-12 text-sm">
+            <p>Cuando tengas la transcripción, preguntale lo que quieras.</p>
+            <div class="mt-4 flex flex-wrap gap-2 justify-center">
+              <button class="suggestion glass hover:bg-white/10 transition rounded-full px-3 py-1.5 text-xs text-slate-300">Resumime en 5 puntos</button>
+              <button class="suggestion glass hover:bg-white/10 transition rounded-full px-3 py-1.5 text-xs text-slate-300">¿Qué tareas dejó el profe?</button>
+              <button class="suggestion glass hover:bg-white/10 transition rounded-full px-3 py-1.5 text-xs text-slate-300">Hacé un repaso de los conceptos clave</button>
+            </div>
+          </div>
+        </div>
+
+        <form id="chat-form" class="mt-4 flex items-end gap-2">
+          <textarea id="chat-input" rows="1" placeholder="Escribí tu pregunta..." disabled
+            class="flex-1 resize-none rounded-xl bg-black/30 border border-white/10 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/60 placeholder:text-slate-500 disabled:opacity-50"></textarea>
+          <button id="chat-send" type="submit" disabled
+            class="grad-bg disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition rounded-xl h-11 w-11 grid place-items-center shrink-0">
+            <svg class="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </form>
+        <p class="text-[11px] text-slate-500 mt-2 text-center">La IA responde según la transcripción de esta grabación.</p>
+      </section>
+    </div>
+  </div>
+
+  <!-- Drawer: Mis sesiones -->
+  <div id="sessions-backdrop" class="hidden fixed inset-0 bg-black/60 z-40"></div>
+  <aside id="sessions-drawer" class="fixed top-0 right-0 h-full w-full max-w-sm glass z-50 translate-x-full transition-transform duration-300 flex flex-col">
+    <div class="flex items-center justify-between p-5 border-b border-white/10">
+      <h3 class="font-bold">Mis sesiones</h3>
+      <button id="close-sessions" class="text-slate-400 hover:text-white transition">
+        <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="sessions-list" class="flex-1 overflow-y-auto p-4 space-y-3">
+      <p id="sessions-empty" class="text-center text-slate-500 text-sm mt-10">Todavía no guardaste ninguna sesión.</p>
+    </div>
+  </aside>
+
+  <!-- Modal: guardar (título) -->
+  <div id="save-modal" class="hidden fixed inset-0 z-50 grid place-items-center p-4">
+    <div class="absolute inset-0 bg-black/60" id="save-modal-backdrop"></div>
+    <div class="glass rounded-2xl p-6 w-full max-w-md relative fade-in">
+      <h3 class="font-bold text-lg mb-1">Guardar sesión</h3>
+      <p class="text-sm text-slate-400 mb-4">Ponele un nombre para encontrarla después.</p>
+      <input id="save-title" type="text" placeholder="Ej: Clase de Historia · martes"
+        class="w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/60 placeholder:text-slate-500" />
+      <div class="flex gap-3 mt-5">
+        <button id="save-confirm" class="flex-1 grad-bg hover:opacity-90 transition rounded-xl py-3 font-semibold">Guardar</button>
+        <button id="save-cancel" class="glass hover:bg-white/10 transition rounded-xl py-3 px-5 font-semibold text-slate-300">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] glass rounded-xl px-5 py-3 text-sm font-medium shadow-xl fade-in"></div>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
