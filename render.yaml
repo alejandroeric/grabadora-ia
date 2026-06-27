@@ -19,8 +19,9 @@ services:
         sync: false
       - key: GROQ_MODEL
         value: whisper-large-v3-turbo
+      # Vacío = autodetectar idioma. NO poner "es" (rompe audio en otro idioma).
       - key: TRANSCRIBE_LANG
-        value: es
+        value: ""
       # Render genera una clave secreta segura solo.
       - key: FLASK_SECRET_KEY
         generateValue: true

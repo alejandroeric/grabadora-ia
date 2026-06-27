@@ -65,7 +65,7 @@
   let segmentTimer = null;
   let transcribeChain = Promise.resolve();
   let pendingChunks = 0;
-  const SEGMENT_MS = 18000; // largo de cada fragmento que se transcribe
+  const SEGMENT_MS = 10000; // largo de cada fragmento que se transcribe
 
   function supportsRecording() {
     return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);

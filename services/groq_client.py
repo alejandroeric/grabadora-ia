@@ -15,7 +15,8 @@ def transcribe(audio_bytes, filename, language=None):
     files = {"file": (filename, audio_bytes)}
     data = {"model": Config.GROQ_MODEL, "response_format": "json"}
     lang = language or Config.TRANSCRIBE_LANG
-    if lang:
+    # Si no se especifica idioma (o es "auto"), Whisper lo detecta solo.
+    if lang and lang.lower() != "auto":
         data["language"] = lang
     headers = {"Authorization": f"Bearer {Config.GROQ_API_KEY}"}
     resp = httpx.post(GROQ_URL, headers=headers, data=data, files=files, timeout=120)

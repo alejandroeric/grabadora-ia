@@ -27,7 +27,9 @@ class Config:
     # --- Groq (transcripción Whisper, free tier) ---
     GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
     GROQ_MODEL = os.environ.get("GROQ_MODEL", "whisper-large-v3-turbo")
-    TRANSCRIBE_LANG = os.environ.get("TRANSCRIBE_LANG", "es")
+    # Vacío = autodetectar idioma (recomendado). Forzar un idioma rompe el
+    # audio que está en otro idioma.
+    TRANSCRIBE_LANG = os.environ.get("TRANSCRIBE_LANG", "")
     MAX_AUDIO_BYTES = 25 * 1024 * 1024
 
     # --- Base de datos ---
