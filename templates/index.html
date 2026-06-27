@@ -67,6 +67,9 @@
     .typing span:nth-child(2){ animation-delay:.2s } .typing span:nth-child(3){ animation-delay:.4s }
     @keyframes blink { 0%,80%,100%{ opacity:.2; transform:translateY(0) } 40%{ opacity:1; transform:translateY(-3px) } }
   </style>
+
+  <!-- Mermaid para los mapas mentales -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 </head>
 
 <body class="font-sans text-slate-100 antialiased min-h-screen relative overflow-x-hidden">
@@ -120,6 +123,61 @@
           <span id="status-text" class="text-slate-300 font-medium">Listo para grabar</span>
         </div>
         <div id="timer" class="font-mono text-2xl font-bold tracking-widest text-slate-200 tabular-nums">00:00</div>
+      </div>
+    </section>
+
+    <!-- Herramientas IA -->
+    <section class="glass rounded-3xl p-5 mb-6">
+      <div class="flex items-center gap-2 mb-3">
+        <svg class="h-5 w-5 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21 8 14 2 9.4h7.6z"/></svg>
+        <h3 class="font-bold">Herramientas IA</h3>
+        <span class="text-xs text-slate-500">(necesitan una transcripción)</span>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- Resumen -->
+        <div class="flex items-center gap-1 glass rounded-xl p-1">
+          <select id="summary-type" class="bg-transparent text-sm px-2 py-1.5 focus:outline-none [&>option]:text-black">
+            <option value="clase">Clase</option>
+            <option value="reunion">Reunión</option>
+            <option value="entrevista">Entrevista</option>
+          </select>
+          <button id="btn-summary" class="grad-bg hover:opacity-90 transition rounded-lg px-3 py-1.5 text-sm font-medium">Resumen</button>
+        </div>
+
+        <!-- Traducir -->
+        <div class="flex items-center gap-1 glass rounded-xl p-1">
+          <select id="translate-lang" class="bg-transparent text-sm px-2 py-1.5 focus:outline-none [&>option]:text-black">
+            <option value="inglés">Inglés</option>
+            <option value="portugués">Portugués</option>
+            <option value="francés">Francés</option>
+            <option value="italiano">Italiano</option>
+            <option value="alemán">Alemán</option>
+            <option value="español">Español</option>
+          </select>
+          <button id="btn-translate" class="grad-bg hover:opacity-90 transition rounded-lg px-3 py-1.5 text-sm font-medium">Traducir</button>
+        </div>
+
+        <!-- Mapa mental -->
+        <button id="btn-mindmap" class="grad-bg hover:opacity-90 transition rounded-xl px-3 py-2 text-sm font-medium">Mapa mental</button>
+
+        <span class="hidden sm:block w-px h-7 bg-white/10 mx-1"></span>
+
+        <!-- Glosario -->
+        <button id="btn-glossary" class="glass hover:bg-white/10 transition rounded-xl px-3 py-2 text-sm font-medium text-slate-300">Glosario</button>
+
+        <span class="hidden sm:block w-px h-7 bg-white/10 mx-1"></span>
+
+        <!-- Exportar -->
+        <button id="btn-export-md" class="glass hover:bg-white/10 transition rounded-xl px-3 py-2 text-sm font-medium text-slate-300">Exportar .md</button>
+        <button id="btn-print" class="glass hover:bg-white/10 transition rounded-xl px-3 py-2 text-sm font-medium text-slate-300">PDF / Imprimir</button>
+      </div>
+
+      <!-- Caja del glosario -->
+      <div id="glossary-box" class="hidden mt-3 fade-in">
+        <textarea id="glossary-text" rows="3" placeholder="Pegá tus términos técnicos, uno por línea. Ej:&#10;mitocondria&#10;ADN polimerasa&#10;sinapsis"
+          class="w-full resize-y rounded-xl bg-black/30 border border-white/10 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/60 placeholder:text-slate-500"></textarea>
+        <p class="text-[11px] text-slate-500 mt-1">Se guarda en este navegador y la IA lo usa para entender y corregir términos técnicos. (Se guarda solo al escribir.)</p>
       </div>
     </section>
 
@@ -211,6 +269,30 @@
       <div class="flex gap-3 mt-5">
         <button id="save-confirm" class="flex-1 grad-bg hover:opacity-90 transition rounded-xl py-3 font-semibold">Guardar</button>
         <button id="save-cancel" class="glass hover:bg-white/10 transition rounded-xl py-3 px-5 font-semibold text-slate-300">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de resultado (resumen / traducción / mapa mental) -->
+  <div id="result-modal" class="hidden fixed inset-0 z-50 grid place-items-center p-4">
+    <div class="absolute inset-0 bg-black/60" id="result-backdrop"></div>
+    <div class="glass rounded-2xl p-6 w-full max-w-3xl relative fade-in max-h-[88vh] flex flex-col">
+      <div class="flex items-center justify-between mb-4">
+        <h3 id="result-title" class="font-bold text-lg">Resultado</h3>
+        <button id="result-close" class="text-slate-400 hover:text-white transition">
+          <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div id="result-loading" class="hidden flex-1 grid place-items-center py-12">
+        <div class="text-center">
+          <div class="typing inline-flex"><span></span><span></span><span></span></div>
+          <p class="text-slate-400 text-sm mt-3">Generando con Claude...</p>
+        </div>
+      </div>
+      <div id="result-text" class="hidden flex-1 overflow-y-auto rounded-xl bg-black/20 p-4 text-sm leading-relaxed whitespace-pre-wrap text-slate-100"></div>
+      <div id="result-mermaid" class="hidden flex-1 overflow-auto rounded-xl bg-black/20 p-4 grid place-items-center"></div>
+      <div class="flex gap-2 mt-4">
+        <button id="result-copy" class="glass hover:bg-white/10 transition rounded-xl px-4 py-2 text-sm font-medium">Copiar</button>
       </div>
     </div>
   </div>

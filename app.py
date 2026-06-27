@@ -13,7 +13,14 @@ from db import (
     save_session,
 )
 from services import anthropic_client
-from validation import ValidationError, validate_chat_input, validate_session_input
+from validation import (
+    ValidationError,
+    validate_chat_input,
+    validate_mindmap_input,
+    validate_session_input,
+    validate_summary_input,
+    validate_translate_input,
+)
 
 
 def create_app(overrides=None):
@@ -44,12 +51,56 @@ def create_app(overrides=None):
                 transcript=data["transcript"],
                 question=data["question"],
                 history=data["messages"],
+                glossary=data["glossary"],
             )
         except Exception:
             return jsonify(
                 {"error": "No se pudo contactar a la IA. Revisá la API key del servidor."}
             ), 502
         return jsonify({"reply": reply})
+
+    # --- Resumen por plantilla (clase / reunión / entrevista) ---
+    @app.post("/api/summary")
+    def summary():
+        try:
+            data = validate_summary_input(request.get_json(silent=True))
+        except ValidationError as e:
+            return jsonify({"error": str(e)}), 400
+        try:
+            text = anthropic_client.generate_summary(
+                data["transcript"], data["type"], glossary=data["glossary"]
+            )
+        except Exception:
+            return jsonify({"error": "No se pudo generar el resumen. Revisá la API key."}), 502
+        return jsonify({"summary": text})
+
+    # --- Traducción del transcript ---
+    @app.post("/api/translate")
+    def translate():
+        try:
+            data = validate_translate_input(request.get_json(silent=True))
+        except ValidationError as e:
+            return jsonify({"error": str(e)}), 400
+        try:
+            text = anthropic_client.translate(
+                data["transcript"], data["target"], glossary=data["glossary"]
+            )
+        except Exception:
+            return jsonify({"error": "No se pudo traducir. Revisá la API key."}), 502
+        return jsonify({"translation": text})
+
+    # --- Mapa mental (Mermaid) ---
+    @app.post("/api/mindmap")
+    def mindmap():
+        try:
+            data = validate_mindmap_input(request.get_json(silent=True))
+        except ValidationError as e:
+            return jsonify({"error": str(e)}), 400
+        try:
+            code = anthropic_client.mindmap(data["transcript"], glossary=data["glossary"])
+        except Exception:
+            return jsonify({"error": "No se pudo generar el mapa mental. Revisá la API key."}), 502
+        return jsonify({"mermaid": code})
 
     # --- Guardar una sesión en SQLite ---
     @app.post("/api/sessions")

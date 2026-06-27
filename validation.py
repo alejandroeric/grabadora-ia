@@ -3,10 +3,33 @@
 Se separa de las rutas para poder testearla de forma aislada.
 """
 from config import Config
+from templates_ia import SUMMARY_TYPES
 
 
 class ValidationError(ValueError):
     """Error de validación de datos de entrada (se traduce a HTTP 400)."""
+
+
+def _require_dict(data):
+    if not isinstance(data, dict):
+        raise ValidationError("El cuerpo debe ser un objeto JSON.")
+    return data
+
+
+def _require_transcript(data):
+    transcript = (data.get("transcript") or "").strip()
+    if not transcript:
+        raise ValidationError("Falta el transcript para darle contexto a la IA.")
+    if len(transcript) > Config.MAX_TRANSCRIPT_LEN:
+        raise ValidationError("El transcript es demasiado largo.")
+    return transcript
+
+
+def _clean_glossary(data):
+    glossary = (data.get("glossary") or "").strip()
+    if len(glossary) > Config.MAX_GLOSSARY_LEN:
+        raise ValidationError("El glosario es demasiado largo.")
+    return glossary
 
 
 def _validate_messages(messages):
@@ -30,8 +53,7 @@ def _validate_messages(messages):
 
 def validate_session_input(data):
     """Valida el body para guardar una sesión. Devuelve datos limpios."""
-    if not isinstance(data, dict):
-        raise ValidationError("El cuerpo debe ser un objeto JSON.")
+    _require_dict(data)
     title = (data.get("title") or "").strip()
     transcript = (data.get("transcript") or "").strip()
     if not title:
@@ -51,12 +73,9 @@ def validate_session_input(data):
 
 def validate_chat_input(data):
     """Valida el body para chatear con Claude. Devuelve datos limpios."""
-    if not isinstance(data, dict):
-        raise ValidationError("El cuerpo debe ser un objeto JSON.")
-    transcript = (data.get("transcript") or "").strip()
+    _require_dict(data)
+    transcript = _require_transcript(data)
     question = (data.get("question") or "").strip()
-    if not transcript:
-        raise ValidationError("Falta el transcript para darle contexto a la IA.")
     if not question:
         raise ValidationError("La pregunta no puede estar vacía.")
     if len(question) > Config.MAX_QUESTION_LEN:
@@ -65,4 +84,34 @@ def validate_chat_input(data):
         "transcript": transcript,
         "question": question,
         "messages": _validate_messages(data.get("messages")),
+        "glossary": _clean_glossary(data),
     }
+
+
+def validate_summary_input(data):
+    """Valida el body para generar un resumen por plantilla."""
+    _require_dict(data)
+    transcript = _require_transcript(data)
+    tipo = (data.get("type") or "clase").strip()
+    if tipo not in SUMMARY_TYPES:
+        raise ValidationError("Tipo de plantilla inválido.")
+    return {"transcript": transcript, "type": tipo, "glossary": _clean_glossary(data)}
+
+
+def validate_translate_input(data):
+    """Valida el body para traducir el transcript."""
+    _require_dict(data)
+    transcript = _require_transcript(data)
+    target = (data.get("target") or "").strip()
+    if not target:
+        raise ValidationError("Falta el idioma de destino.")
+    if len(target) > 50:
+        raise ValidationError("Idioma de destino inválido.")
+    return {"transcript": transcript, "target": target, "glossary": _clean_glossary(data)}
+
+
+def validate_mindmap_input(data):
+    """Valida el body para generar el mapa mental."""
+    _require_dict(data)
+    transcript = _require_transcript(data)
+    return {"transcript": transcript, "glossary": _clean_glossary(data)}

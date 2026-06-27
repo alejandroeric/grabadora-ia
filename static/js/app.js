@@ -214,6 +214,7 @@
           transcript: finalTranscript,
           question,
           messages: chatHistory.slice(0, -1),
+          glossary: getGlossary(),
         }),
       });
       const data = await res.json();
@@ -439,6 +440,176 @@
     }
   }
 
+  // ---------- Glosario ----------
+  const glossaryText = $("glossary-text");
+
+  function getGlossary() {
+    return (glossaryText.value || "").trim();
+  }
+  function loadGlossary() {
+    const g = localStorage.getItem("notaia_glossary");
+    if (g) glossaryText.value = g;
+  }
+  glossaryText.addEventListener("input", () => {
+    localStorage.setItem("notaia_glossary", glossaryText.value);
+  });
+  $("btn-glossary").addEventListener("click", () => {
+    $("glossary-box").classList.toggle("hidden");
+  });
+
+  // ---------- Modal de resultado ----------
+  const resultModal = $("result-modal");
+  let resultCopyText = "";
+
+  function showResult(title, { loading = false, text = null, mermaid = null } = {}) {
+    $("result-title").textContent = title;
+    resultModal.classList.remove("hidden");
+    $("result-loading").classList.toggle("hidden", !loading);
+    $("result-text").classList.add("hidden");
+    $("result-mermaid").classList.add("hidden");
+    $("result-copy").classList.toggle("hidden", loading);
+    if (text !== null) {
+      $("result-text").textContent = text;
+      $("result-text").classList.remove("hidden");
+      resultCopyText = text;
+    }
+    if (mermaid !== null) {
+      renderMermaid(mermaid);
+      $("result-mermaid").classList.remove("hidden");
+      resultCopyText = mermaid;
+    }
+  }
+  function closeResult() {
+    resultModal.classList.add("hidden");
+  }
+  $("result-close").addEventListener("click", closeResult);
+  $("result-backdrop").addEventListener("click", closeResult);
+  $("result-copy").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(resultCopyText);
+      toast("Copiado");
+    } catch {
+      toast("No se pudo copiar", true);
+    }
+  });
+
+  async function renderMermaid(code) {
+    const container = $("result-mermaid");
+    container.innerHTML = "";
+    try {
+      const { svg } = await window.mermaid.render("mm" + Date.now(), code);
+      container.innerHTML = svg;
+    } catch {
+      container.innerHTML =
+        '<pre class="text-xs text-pink-300 whitespace-pre-wrap text-left">No se pudo dibujar el diagrama. Codigo generado:\n\n' +
+        escapeHtml(code) +
+        "</pre>";
+    }
+  }
+
+  // ---------- Herramientas IA ----------
+  async function apiPost(url, payload) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error del servidor");
+    return data;
+  }
+
+  function requireTranscript() {
+    if (!hasTranscript()) {
+      toast("Primero grabá o abrí una sesión", true);
+      return false;
+    }
+    return true;
+  }
+
+  async function doSummary() {
+    if (!requireTranscript()) return;
+    const type = $("summary-type").value;
+    showResult("Resumen", { loading: true });
+    try {
+      const d = await apiPost("/api/summary", {
+        transcript: finalTranscript,
+        type,
+        glossary: getGlossary(),
+      });
+      showResult("Resumen", { text: d.summary });
+    } catch (e) {
+      closeResult();
+      toast(e.message, true);
+    }
+  }
+
+  async function doTranslate() {
+    if (!requireTranscript()) return;
+    const target = $("translate-lang").value;
+    showResult("Traducción · " + target, { loading: true });
+    try {
+      const d = await apiPost("/api/translate", {
+        transcript: finalTranscript,
+        target,
+        glossary: getGlossary(),
+      });
+      showResult("Traducción · " + target, { text: d.translation });
+    } catch (e) {
+      closeResult();
+      toast(e.message, true);
+    }
+  }
+
+  async function doMindmap() {
+    if (!requireTranscript()) return;
+    showResult("Mapa mental", { loading: true });
+    try {
+      const d = await apiPost("/api/mindmap", {
+        transcript: finalTranscript,
+        glossary: getGlossary(),
+      });
+      showResult("Mapa mental", { mermaid: d.mermaid });
+    } catch (e) {
+      closeResult();
+      toast(e.message, true);
+    }
+  }
+
+  $("btn-summary").addEventListener("click", doSummary);
+  $("btn-translate").addEventListener("click", doTranslate);
+  $("btn-mindmap").addEventListener("click", doMindmap);
+
+  // ---------- Exportar ----------
+  function buildMarkdown() {
+    let md = "# Transcripción\n\n" + finalTranscript.trim() + "\n";
+    if (chatHistory.length) {
+      md += "\n# Chat\n\n";
+      for (const m of chatHistory) {
+        md += (m.role === "user" ? "**Vos:** " : "**Claude:** ") + m.content + "\n\n";
+      }
+    }
+    return md;
+  }
+  $("btn-export-md").addEventListener("click", () => {
+    if (!requireTranscript()) return;
+    const blob = new Blob([buildMarkdown()], { type: "text/markdown;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "notaia.md";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast("Archivo .md descargado");
+  });
+  $("btn-print").addEventListener("click", () => {
+    if (!requireTranscript()) return;
+    window.print();
+  });
+
   // ---------- Init ----------
+  if (window.mermaid) {
+    window.mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "loose" });
+  }
+  loadGlossary();
   setupRecognition();
 })();
