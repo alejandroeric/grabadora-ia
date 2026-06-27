@@ -7,6 +7,10 @@ import sys
 
 import pytest
 
+# Los tests SIEMPRE usan SQLite, sin importar lo que haya en el .env.
+# (load_dotenv no pisa una variable ya existente, así que esto gana.)
+os.environ["DATABASE_URL"] = ""
+
 # Permite importar los módulos del proyecto (app, db, etc.) desde tests/
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 

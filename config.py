@@ -25,6 +25,9 @@ class Config:
     APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
 
     # --- Base de datos ---
+    # Si DATABASE_URL apunta a Postgres (Neon en prod), se usa Postgres.
+    # Si está vacía, se usa SQLite en el archivo DATABASE_PATH (dev local).
+    DATABASE_URL = os.environ.get("DATABASE_URL", "")
     DATABASE_PATH = os.environ.get("DATABASE_PATH", "grabadora.db")
 
     # --- Límites de validación de entrada ---
