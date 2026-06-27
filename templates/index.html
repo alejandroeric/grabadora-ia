@@ -180,61 +180,28 @@
       <button id="tools-toggle" type="button" class="w-full flex items-center gap-2">
         <svg class="h-5 w-5 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21 8 14 2 9.4h7.6z"/></svg>
         <h3 class="font-bold">Herramientas IA</h3>
-        <span class="text-xs text-slate-500 hidden sm:inline">resumen · traducción · mapa mental · flashcards</span>
+        <span class="text-xs text-slate-500 hidden sm:inline">resumen · flashcards · cuestionario · cuadro · tareas</span>
         <svg id="tools-chevron" class="h-5 w-5 ml-auto text-slate-400 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
 
       <div id="tools-content" class="hidden mt-3">
       <div class="flex flex-wrap items-center gap-2">
-        <!-- Resumen -->
-        <div class="flex items-center gap-1 glass rounded-xl p-1">
-          <select id="summary-type" class="bg-transparent text-sm px-2 py-1.5 focus:outline-none [&>option]:text-black">
-            <option value="clase">Clase</option>
-            <option value="reunion">Reunión</option>
-            <option value="entrevista">Entrevista</option>
-          </select>
-          <button id="btn-summary" class="grad-bg hover:opacity-90 transition rounded-lg px-3 py-1.5 text-sm font-medium">Resumen</button>
-        </div>
-
-        <!-- Traducir -->
-        <div class="flex items-center gap-1 glass rounded-xl p-1">
-          <select id="translate-lang" class="bg-transparent text-sm px-2 py-1.5 focus:outline-none [&>option]:text-black">
-            <option value="inglés">Inglés</option>
-            <option value="portugués">Portugués</option>
-            <option value="francés">Francés</option>
-            <option value="italiano">Italiano</option>
-            <option value="alemán">Alemán</option>
-            <option value="español">Español</option>
-          </select>
-          <button id="btn-translate" class="grad-bg hover:opacity-90 transition rounded-lg px-3 py-1.5 text-sm font-medium">Traducir</button>
-        </div>
-
-        <!-- Mapa mental -->
-        <button id="btn-mindmap" class="grad-bg hover:opacity-90 transition rounded-xl px-3 py-2 text-sm font-medium">Mapa mental</button>
-
-        <!-- Flashcards -->
-        <button id="btn-flashcards" class="grad-bg hover:opacity-90 transition rounded-xl px-3 py-2 text-sm font-medium">Flashcards</button>
-
-        <!-- Cuestionario / Cuadro / Tareas -->
-        <button id="btn-quiz" class="grad-bg hover:opacity-90 transition rounded-xl px-3 py-2 text-sm font-medium">Cuestionario</button>
-        <button id="btn-table" class="grad-bg hover:opacity-90 transition rounded-xl px-3 py-2 text-sm font-medium">Cuadro</button>
-        <button id="btn-tasks" class="grad-bg hover:opacity-90 transition rounded-xl px-3 py-2 text-sm font-medium">Tareas</button>
-
-        <span class="hidden sm:block w-px h-7 bg-white/10 mx-1"></span>
-
-        <!-- Pulir texto (modifica la transcripción) -->
-        <button id="btn-polish" class="glass hover:bg-white/10 transition rounded-xl px-3 py-2 text-sm font-medium text-slate-300">Pulir texto</button>
-
-        <span class="hidden sm:block w-px h-7 bg-white/10 mx-1"></span>
-
-        <!-- Glosario -->
-        <button id="btn-glossary" class="glass hover:bg-white/10 transition rounded-xl px-3 py-2 text-sm font-medium text-slate-300">Glosario</button>
-
-        <span class="hidden sm:block w-px h-7 bg-white/10 mx-1"></span>
-
-        <!-- Exportar -->
-        <button id="btn-export-md" class="glass hover:bg-white/10 transition rounded-xl px-3 py-2 text-sm font-medium text-slate-300">Exportar .md</button>
-        <button id="btn-print" class="glass hover:bg-white/10 transition rounded-xl px-3 py-2 text-sm font-medium text-slate-300">PDF / Imprimir</button>
+        <!-- Resumen (elegís el tipo en el desplegable) -->
+        <select id="summary-type" class="bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/60 [&>option]:text-black">
+          <option value="clase">Clase</option>
+          <option value="reunion">Reunión</option>
+          <option value="entrevista">Entrevista</option>
+        </select>
+        <button id="btn-summary" class="grad-bg hover:opacity-90 transition rounded-xl px-4 py-2 text-sm font-medium">Resumen</button>
+        <button id="btn-mindmap" class="grad-bg hover:opacity-90 transition rounded-xl px-4 py-2 text-sm font-medium">Mapa mental</button>
+        <button id="btn-flashcards" class="grad-bg hover:opacity-90 transition rounded-xl px-4 py-2 text-sm font-medium">Flashcards</button>
+        <button id="btn-quiz" class="grad-bg hover:opacity-90 transition rounded-xl px-4 py-2 text-sm font-medium">Cuestionario</button>
+        <button id="btn-table" class="grad-bg hover:opacity-90 transition rounded-xl px-4 py-2 text-sm font-medium">Cuadro</button>
+        <button id="btn-tasks" class="grad-bg hover:opacity-90 transition rounded-xl px-4 py-2 text-sm font-medium">Tareas</button>
+        <button id="btn-polish" class="grad-bg hover:opacity-90 transition rounded-xl px-4 py-2 text-sm font-medium">Pulir texto</button>
+        <button id="btn-glossary" class="grad-bg hover:opacity-90 transition rounded-xl px-4 py-2 text-sm font-medium">Glosario</button>
+        <button id="btn-export-md" class="grad-bg hover:opacity-90 transition rounded-xl px-4 py-2 text-sm font-medium">Exportar .md</button>
+        <button id="btn-print" class="grad-bg hover:opacity-90 transition rounded-xl px-4 py-2 text-sm font-medium">PDF / Imprimir</button>
       </div>
 
       <!-- Caja del glosario -->

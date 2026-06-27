@@ -777,23 +777,6 @@
     }
   }
 
-  async function doTranslate() {
-    if (!requireTranscript()) return;
-    const target = $("translate-lang").value;
-    showResult("Traducción · " + target, { loading: true });
-    try {
-      const d = await apiPost("/api/translate", {
-        transcript: finalTranscript,
-        target,
-        glossary: getGlossary(),
-      });
-      showResult("Traducción · " + target, { text: d.translation });
-    } catch (e) {
-      closeResult();
-      toast(e.message, true);
-    }
-  }
-
   async function doMindmap() {
     if (!requireTranscript()) return;
     showResult("Mapa mental", { loading: true });
@@ -810,7 +793,6 @@
   }
 
   $("btn-summary").addEventListener("click", doSummary);
-  $("btn-translate").addEventListener("click", doTranslate);
   $("btn-mindmap").addEventListener("click", doMindmap);
 
   // ---------- Exportar ----------
