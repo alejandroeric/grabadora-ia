@@ -32,7 +32,7 @@ from db import (
     save_session,
     update_flashcard_srs,
 )
-from services import anthropic_client
+from services import anthropic_client, groq_client
 from srs import sm2
 from validation import (
     ValidationError,
@@ -116,6 +116,27 @@ def create_app(overrides=None):
                 {"error": "No se pudo contactar a la IA. Revisá la API key del servidor."}
             ), 502
         return jsonify({"reply": reply})
+
+    # --- Transcripción de audio (Whisper vía Groq) ---
+    @app.post("/api/transcribe")
+    @require_auth
+    @rate_limit(60, 60)
+    def transcribe_audio():
+        f = request.files.get("audio")
+        if f is None:
+            return jsonify({"error": "Falta el archivo de audio."}), 400
+        audio = f.read()
+        if not audio:
+            return jsonify({"error": "El audio está vacío."}), 400
+        if len(audio) > app.config["MAX_AUDIO_BYTES"]:
+            return jsonify({"error": "El fragmento de audio es demasiado grande."}), 400
+        try:
+            text = groq_client.transcribe(audio, f.filename or "audio.webm")
+        except Exception:
+            return jsonify(
+                {"error": "No se pudo transcribir. Revisá la GROQ_API_KEY del servidor."}
+            ), 502
+        return jsonify({"text": text})
 
     # --- Chat con streaming (respuesta token por token, vía SSE) ---
     @app.post("/api/chat/stream")

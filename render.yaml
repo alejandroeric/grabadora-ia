@@ -14,6 +14,13 @@ services:
       # Modelo más económico (Haiku). Editable desde el panel si querés.
       - key: ANTHROPIC_MODEL
         value: claude-haiku-4-5-20251001
+      # Transcripción con Groq/Whisper (free tier). Key a mano en el panel.
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: whisper-large-v3-turbo
+      - key: TRANSCRIBE_LANG
+        value: es
       # Render genera una clave secreta segura solo.
       - key: FLASK_SECRET_KEY
         generateValue: true

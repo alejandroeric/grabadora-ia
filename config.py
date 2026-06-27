@@ -24,6 +24,12 @@ class Config:
     # queda abierta (cómodo para desarrollo local).
     APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
 
+    # --- Groq (transcripción Whisper, free tier) ---
+    GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+    GROQ_MODEL = os.environ.get("GROQ_MODEL", "whisper-large-v3-turbo")
+    TRANSCRIBE_LANG = os.environ.get("TRANSCRIBE_LANG", "es")
+    MAX_AUDIO_BYTES = 25 * 1024 * 1024
+
     # --- Base de datos ---
     # Si DATABASE_URL apunta a Postgres (Neon en prod), se usa Postgres.
     # Si está vacía, se usa SQLite en el archivo DATABASE_PATH (dev local).

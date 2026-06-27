@@ -59,54 +59,115 @@
     return finalTranscript.trim().length > 0;
   }
 
-  // ---------- Reconocimiento de voz ----------
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  // ---------- Grabación de audio (MediaRecorder + Whisper/Groq) ----------
+  let mediaStream = null;
+  let mediaRecorder = null;
+  let segmentTimer = null;
+  let transcribeChain = Promise.resolve();
+  let pendingChunks = 0;
+  const SEGMENT_MS = 18000; // largo de cada fragmento que se transcribe
 
-  function setupRecognition() {
-    if (!SpeechRecognition) {
+  function supportsRecording() {
+    return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+  }
+
+  function pickMime() {
+    const opts = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
+    for (const m of opts) {
+      if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m;
+    }
+    return "";
+  }
+
+  function setupRecorder() {
+    if (!supportsRecording()) {
       $("browser-warning").classList.remove("hidden");
       recordBtn.disabled = true;
       recordBtn.classList.add("opacity-40", "cursor-not-allowed");
-      return;
     }
-    recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = "es-AR";
-
-    recognition.onresult = (event) => {
-      let interim = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const chunk = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          finalTranscript += chunk + " ";
-        } else {
-          interim += chunk;
-        }
-      }
-      renderTranscript(interim);
-    };
-
-    recognition.onerror = (e) => {
-      if (e.error === "no-speech" || e.error === "aborted") return;
-      toast("Error de micrófono: " + e.error, true);
-    };
-
-    // Si sigue grabando, reiniciar al cortarse solo (límite del navegador)
-    recognition.onend = () => {
-      if (isRecording) recognition.start();
-    };
   }
 
-  function renderTranscript(interim = "") {
-    if (hasTranscript() || interim) transcriptEmpty.classList.add("hidden");
+  function renderTranscript() {
+    if (hasTranscript()) transcriptEmpty.classList.add("hidden");
     transcriptFinal.textContent = finalTranscript;
-    transcriptInterim.textContent = interim;
+    transcriptInterim.textContent = pendingChunks > 0 ? " ⏳ transcribiendo..." : "";
     transcriptBox.scrollTop = transcriptBox.scrollHeight;
   }
 
   // ---------- Control de grabación ----------
-  function startRecording() {
+  const MIC_ICON =
+    '<svg class="h-9 w-9 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>';
+  const STOP_ICON =
+    '<svg class="h-8 w-8 text-white" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+
+  function extFor(type) {
+    if (type.includes("mp4")) return "mp4";
+    if (type.includes("ogg")) return "ogg";
+    return "webm";
+  }
+
+  function queueTranscription(blob, type) {
+    pendingChunks++;
+    renderTranscript();
+    transcribeChain = transcribeChain.then(async () => {
+      const fd = new FormData();
+      fd.append("audio", blob, "segmento." + extFor(type));
+      try {
+        const res = await fetch("/api/transcribe", { method: "POST", body: fd });
+        if (res.status === 401) {
+          window.location = "/login";
+          return;
+        }
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.text) {
+          const sep = finalTranscript && !finalTranscript.endsWith(" ") ? " " : "";
+          finalTranscript += sep + data.text.trim() + " ";
+          transcriptEmpty.classList.add("hidden");
+        } else if (!res.ok) {
+          toast(data.error || "Error al transcribir un fragmento", true);
+        }
+      } catch {
+        toast("No se pudo transcribir un fragmento", true);
+      } finally {
+        pendingChunks--;
+        renderTranscript();
+      }
+    });
+  }
+
+  function startSegment() {
+    const mime = pickMime();
+    const chunks = [];
+    mediaRecorder = mime
+      ? new MediaRecorder(mediaStream, { mimeType: mime, audioBitsPerSecond: 64000 })
+      : new MediaRecorder(mediaStream);
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data && e.data.size) chunks.push(e.data);
+    };
+    mediaRecorder.onstop = () => {
+      const type = mediaRecorder.mimeType || mime || "audio/webm";
+      const blob = new Blob(chunks, { type });
+      const wasRecording = isRecording;
+      if (wasRecording) {
+        startSegment(); // arranca el próximo segmento ya, mínimo hueco
+      } else if (mediaStream) {
+        mediaStream.getTracks().forEach((t) => t.stop());
+      }
+      if (blob.size > 1000) queueTranscription(blob, type);
+      if (!wasRecording) transcribeChain.then(finalizeAfterStop);
+    };
+    mediaRecorder.start();
+  }
+
+  async function startRecording() {
+    try {
+      mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: { noiseSuppression: true, echoCancellation: true, autoGainControl: true },
+      });
+    } catch {
+      toast("No se pudo acceder al micrófono. Dale permiso al navegador.", true);
+      return;
+    }
     finalTranscript = "";
     chatHistory = [];
     renderChat();
@@ -121,38 +182,48 @@
       timerEl.textContent = fmtTime(seconds);
     }, 1000);
 
-    recognition.start();
+    startSegment();
+    segmentTimer = setInterval(() => {
+      if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
+    }, SEGMENT_MS);
+
     recordBtn.classList.add("rec-pulse");
-    recordIcon.innerHTML =
-      '<svg class="h-8 w-8 text-white" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+    recordIcon.innerHTML = STOP_ICON;
     statusDot.className = "h-2.5 w-2.5 rounded-full bg-pink-500 animate-pulse";
     statusText.textContent = "Grabando...";
   }
 
-  function stopRecording() {
-    isRecording = false;
-    clearInterval(timerId);
-    if (recognition) recognition.stop();
-
-    recordBtn.classList.remove("rec-pulse");
-    recordIcon.innerHTML =
-      '<svg class="h-9 w-9 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>';
-
+  function finalizeAfterStop() {
     if (hasTranscript()) {
       statusDot.className = "h-2.5 w-2.5 rounded-full bg-emerald-500";
       statusText.textContent = "Grabación lista";
       actions.classList.remove("hidden");
       copyBtn.classList.remove("hidden");
       enableChat(true);
-      renderTranscript();
     } else {
       statusDot.className = "h-2.5 w-2.5 rounded-full bg-slate-500";
       statusText.textContent = "No se detectó audio";
     }
+    renderTranscript();
+  }
+
+  function stopRecording() {
+    isRecording = false;
+    clearInterval(timerId);
+    clearInterval(segmentTimer);
+    recordBtn.classList.remove("rec-pulse");
+    recordIcon.innerHTML = MIC_ICON;
+    statusDot.className = "h-2.5 w-2.5 rounded-full bg-amber-400 animate-pulse";
+    statusText.textContent = "Procesando audio...";
+    if (mediaRecorder && mediaRecorder.state === "recording") {
+      mediaRecorder.stop(); // dispara la transcripción del último fragmento
+    } else {
+      transcribeChain.then(finalizeAfterStop);
+    }
   }
 
   recordBtn.addEventListener("click", () => {
-    if (!recognition) return;
+    if (!supportsRecording()) return;
     isRecording ? stopRecording() : startRecording();
   });
 
@@ -834,5 +905,5 @@
   }
   loadGlossary();
   refreshDueBadge();
-  setupRecognition();
+  setupRecorder();
 })();
