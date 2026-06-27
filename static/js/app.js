@@ -896,7 +896,21 @@
     });
   });
 
+  // ---------- Secciones colapsables ----------
+  function setupCollapse(toggleId, contentId, chevronId) {
+    const t = $(toggleId);
+    const c = $(contentId);
+    const ch = $(chevronId);
+    if (!t || !c) return;
+    t.addEventListener("click", () => {
+      const nowHidden = c.classList.toggle("hidden");
+      if (ch) ch.classList.toggle("rotate-180", !nowHidden);
+    });
+  }
+
   // ---------- Init ----------
+  setupCollapse("tools-toggle", "tools-content", "tools-chevron");
+  setupCollapse("chat-toggle", "chat-content", "chat-chevron");
   if (window.mermaid) {
     window.mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "loose" });
   }
