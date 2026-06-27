@@ -2,10 +2,12 @@
 
 No tiene lógica de SQLite ni de IA adentro: solo orquesta.
 """
+import json
 from datetime import date, timedelta
 
 from flask import (
     Flask,
+    Response,
     jsonify,
     redirect,
     render_template,
@@ -104,6 +106,33 @@ def create_app(overrides=None):
                 {"error": "No se pudo contactar a la IA. Revisá la API key del servidor."}
             ), 502
         return jsonify({"reply": reply})
+
+    # --- Chat con streaming (respuesta token por token, vía SSE) ---
+    @app.post("/api/chat/stream")
+    @require_auth
+    @rate_limit(30, 60)
+    def chat_stream():
+        try:
+            data = validate_chat_input(request.get_json(silent=True))
+        except ValidationError as e:
+            return jsonify({"error": str(e)}), 400
+
+        def generate():
+            try:
+                for chunk in anthropic_client.stream_ask(
+                    transcript=data["transcript"],
+                    question=data["question"],
+                    history=data["messages"],
+                    glossary=data["glossary"],
+                ):
+                    yield "data: " + json.dumps({"text": chunk}) + "\n\n"
+                yield "event: done\ndata: {}\n\n"
+            except Exception:
+                yield "event: error\ndata: " + json.dumps(
+                    {"error": "No se pudo contactar a la IA. Revisá la API key."}
+                ) + "\n\n"
+
+        return Response(generate(), mimetype="text/event-stream")
 
     # --- Resumen por plantilla (clase / reunión / entrevista) ---
     @app.post("/api/summary")

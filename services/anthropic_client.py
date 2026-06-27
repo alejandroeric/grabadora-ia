@@ -78,6 +78,19 @@ def ask(transcript, question, history=None, glossary=None, client=None):
     return _complete(build_messages(transcript, history, question), _system(glossary), client)
 
 
+def stream_ask(transcript, question, history=None, glossary=None, client=None):
+    """Igual que ask(), pero va devolviendo el texto en fragmentos (streaming)."""
+    client = client or Anthropic(api_key=Config.ANTHROPIC_API_KEY)
+    with client.messages.stream(
+        model=Config.ANTHROPIC_MODEL,
+        max_tokens=Config.MAX_TOKENS,
+        system=_system(glossary),
+        messages=build_messages(transcript, history, question),
+    ) as stream:
+        for text in stream.text_stream:
+            yield text
+
+
 def generate_summary(transcript, template_key, glossary=None, client=None):
     """Resumen estructurado según la plantilla (clase / reunión / entrevista)."""
     instructions = SUMMARY_TEMPLATES[template_key]

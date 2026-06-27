@@ -63,3 +63,16 @@ def test_chat_route_validates_input(client):
     res = client.post("/api/chat", json={"transcript": "", "question": ""})
     assert res.status_code == 400
     assert "error" in res.get_json()
+
+
+def test_chat_stream_route(client, monkeypatch):
+    monkeypatch.setattr(anthropic_client, "stream_ask", lambda **kwargs: iter(["Hola", " mundo"]))
+    res = client.post("/api/chat/stream", json={"transcript": "t", "question": "q"})
+    assert res.status_code == 200
+    body = res.get_data(as_text=True)
+    assert "Hola" in body and "mundo" in body
+
+
+def test_chat_stream_validates_input(client):
+    res = client.post("/api/chat/stream", json={"transcript": "", "question": ""})
+    assert res.status_code == 400

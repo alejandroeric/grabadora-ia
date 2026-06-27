@@ -206,8 +206,19 @@
     const typing = showTyping();
     enableChat(false);
 
+    let assistantText = "";
+    let inner = null; // burbuja de la IA, se crea con el primer token
+    let gotError = false;
+
+    const ensureBubble = () => {
+      if (!inner) {
+        if (typing.parentNode) typing.remove();
+        inner = addBubble("assistant", "").querySelector("div");
+      }
+    };
+
     try {
-      const res = await fetch("/api/chat", {
+      const res = await fetch("/api/chat/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -221,18 +232,61 @@
         window.location = "/login";
         return;
       }
-      const data = await res.json();
-      typing.remove();
       if (!res.ok) {
+        if (typing.parentNode) typing.remove();
+        const data = await res.json().catch(() => ({}));
         toast(data.error || "Error al consultar la IA", true);
         chatHistory.pop();
         return;
       }
-      chatHistory.push({ role: "assistant", content: data.reply });
-      addBubble("assistant", data.reply);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split("\n\n");
+        buffer = events.pop(); // el último puede estar incompleto
+        for (const evt of events) {
+          let type = "message";
+          let dataStr = "";
+          for (const line of evt.split("\n")) {
+            if (line.startsWith("event:")) type = line.slice(6).trim();
+            else if (line.startsWith("data:")) dataStr += line.slice(5).trim();
+          }
+          if (!dataStr) continue;
+          if (type === "error") {
+            gotError = true;
+            let msg = "Error de la IA";
+            try { msg = JSON.parse(dataStr).error || msg; } catch {}
+            toast(msg, true);
+          } else if (type === "message") {
+            try {
+              const payload = JSON.parse(dataStr);
+              if (payload.text) {
+                ensureBubble();
+                assistantText += payload.text;
+                inner.textContent = assistantText;
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+              }
+            } catch {}
+          }
+        }
+      }
+
+      if (typing.parentNode) typing.remove();
+      if (gotError || !assistantText) {
+        chatHistory.pop();
+        if (inner) inner.closest(".bubble").remove();
+      } else {
+        chatHistory.push({ role: "assistant", content: assistantText });
+      }
     } catch (err) {
-      typing.remove();
+      if (typing.parentNode) typing.remove();
       chatHistory.pop();
+      if (inner) inner.closest(".bubble").remove();
       toast("No se pudo conectar con el servidor", true);
     } finally {
       enableChat(true);
