@@ -1,0 +1,22 @@
+# Blueprint de Render: configura el Web Service automáticamente.
+# En Render: New + -> Blueprint -> elegí este repo.
+services:
+  - type: web
+    name: grabadora-ia
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      # La API key se carga a mano en el panel de Render (NO se versiona).
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # Modelo más económico (Haiku). Editable desde el panel si querés.
+      - key: ANTHROPIC_MODEL
+        value: claude-haiku-4-5-20251001
+      # Render genera una clave secreta segura solo.
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      # Versión de Python a usar en el deploy.
+      - key: PYTHON_VERSION
+        value: "3.12.10"
