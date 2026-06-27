@@ -2,9 +2,20 @@
 
 No tiene lógica de SQLite ni de IA adentro: solo orquesta.
 """
-from flask import Flask, jsonify, render_template, request
+from datetime import timedelta
+
+from flask import (
+    Flask,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 
 from config import Config
+from security import rate_limit, require_auth
 from db import (
     delete_session,
     get_session,
@@ -29,18 +40,44 @@ def create_app(overrides=None):
     if overrides:
         app.config.update(overrides)
 
+    app.config.setdefault("PERMANENT_SESSION_LIFETIME", timedelta(days=14))
     init_db(app.config["DATABASE_PATH"])
 
     def db_path():
         return app.config["DATABASE_PATH"]
 
+    # --- Login / logout ---
+    @app.get("/login")
+    def login():
+        if not app.config.get("APP_PASSWORD") or session.get("authed"):
+            return redirect(url_for("index"))
+        return render_template("login.html", error=None)
+
+    @app.post("/login")
+    @rate_limit(10, 300)
+    def login_post():
+        password = request.form.get("password") or ""
+        if password and password == app.config.get("APP_PASSWORD"):
+            session["authed"] = True
+            session.permanent = True
+            return redirect(url_for("index"))
+        return render_template("login.html", error="Contraseña incorrecta."), 401
+
+    @app.get("/logout")
+    def logout():
+        session.pop("authed", None)
+        return redirect(url_for("login"))
+
     # --- Página principal ---
     @app.get("/")
+    @require_auth
     def index():
         return render_template("index.html")
 
     # --- Chat con Claude sobre el transcript (sin persistir) ---
     @app.post("/api/chat")
+    @require_auth
+    @rate_limit(30, 60)
     def chat():
         try:
             data = validate_chat_input(request.get_json(silent=True))
@@ -61,6 +98,8 @@ def create_app(overrides=None):
 
     # --- Resumen por plantilla (clase / reunión / entrevista) ---
     @app.post("/api/summary")
+    @require_auth
+    @rate_limit(30, 60)
     def summary():
         try:
             data = validate_summary_input(request.get_json(silent=True))
@@ -76,6 +115,8 @@ def create_app(overrides=None):
 
     # --- Traducción del transcript ---
     @app.post("/api/translate")
+    @require_auth
+    @rate_limit(30, 60)
     def translate():
         try:
             data = validate_translate_input(request.get_json(silent=True))
@@ -91,6 +132,8 @@ def create_app(overrides=None):
 
     # --- Mapa mental (Mermaid) ---
     @app.post("/api/mindmap")
+    @require_auth
+    @rate_limit(30, 60)
     def mindmap():
         try:
             data = validate_mindmap_input(request.get_json(silent=True))
@@ -104,6 +147,7 @@ def create_app(overrides=None):
 
     # --- Guardar una sesión en SQLite ---
     @app.post("/api/sessions")
+    @require_auth
     def create_session():
         try:
             data = validate_session_input(request.get_json(silent=True))
@@ -116,11 +160,13 @@ def create_app(overrides=None):
 
     # --- Listar sesiones guardadas ---
     @app.get("/api/sessions")
+    @require_auth
     def get_sessions():
         return jsonify(list_sessions(db_path()))
 
     # --- Leer una sesión completa ---
     @app.get("/api/sessions/<int:session_id>")
+    @require_auth
     def read_session(session_id):
         session = get_session(db_path(), session_id)
         if session is None:
@@ -129,6 +175,7 @@ def create_app(overrides=None):
 
     # --- Borrar una sesión ---
     @app.delete("/api/sessions/<int:session_id>")
+    @require_auth
     def remove_session(session_id):
         if not delete_session(db_path(), session_id):
             return jsonify({"error": "Sesión no encontrada."}), 404

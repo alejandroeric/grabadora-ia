@@ -217,6 +217,10 @@
           glossary: getGlossary(),
         }),
       });
+      if (res.status === 401) {
+        window.location = "/login";
+        return;
+      }
       const data = await res.json();
       typing.remove();
       if (!res.ok) {
@@ -514,6 +518,10 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+    if (res.status === 401) {
+      window.location = "/login";
+      throw new Error("Sesión expirada");
+    }
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error del servidor");
     return data;

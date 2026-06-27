@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0b1020" />
+  <title>NotaIA · Ingresar</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root { color-scheme: dark; }
+    html, body { background: #0b1020; font-family: 'Inter', system-ui, sans-serif; }
+    .orb { position: fixed; border-radius: 9999px; filter: blur(90px); opacity: .45; }
+    .grad-text { background: linear-gradient(110deg, #818cf8, #c084fc 45%, #f472b6); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .grad-bg { background-image: linear-gradient(110deg, #6366f1, #a855f7 50%, #ec4899); }
+    .glass { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); backdrop-filter: blur(12px); }
+  </style>
+</head>
+<body class="text-slate-100 min-h-screen grid place-items-center p-4 relative overflow-hidden">
+  <div class="orb" style="width:340px;height:340px;background:#6366f1;top:-80px;left:-60px;"></div>
+  <div class="orb" style="width:300px;height:300px;background:#ec4899;bottom:-90px;right:-40px;"></div>
+
+  <div class="glass rounded-3xl p-8 w-full max-w-sm relative z-10">
+    <div class="flex items-center gap-3 mb-6">
+      <div class="h-11 w-11 rounded-2xl grad-bg grid place-items-center shadow-lg shadow-purple-900/40">
+        <svg class="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+      </div>
+      <div>
+        <h1 class="text-xl font-extrabold">Nota<span class="grad-text">IA</span></h1>
+        <p class="text-xs text-slate-400 -mt-0.5">Ingresá para continuar</p>
+      </div>
+    </div>
+
+    {% if error %}
+    <div class="mb-4 rounded-xl bg-pink-500/10 border border-pink-500/30 px-4 py-2.5 text-sm text-pink-200">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('login_post') }}" class="space-y-4">
+      <div>
+        <label class="block text-sm text-slate-300 mb-1.5">Contraseña</label>
+        <input type="password" name="password" autofocus required
+          class="w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/60 placeholder:text-slate-500"
+          placeholder="••••••••" />
+      </div>
+      <button type="submit" class="w-full grad-bg hover:opacity-90 transition rounded-xl py-3 font-semibold">Entrar</button>
+    </form>
+  </div>
+</body>
+</html>

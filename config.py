@@ -19,6 +19,11 @@ class Config:
     # --- Flask ---
     SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "dev-inseguro-cambiar-en-produccion")
 
+    # --- Seguridad ---
+    # Si está definida, la app pide login con esta contraseña. Si está vacía,
+    # queda abierta (cómodo para desarrollo local).
+    APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
+
     # --- Base de datos ---
     DATABASE_PATH = os.environ.get("DATABASE_PATH", "grabadora.db")
 

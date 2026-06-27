@@ -17,6 +17,9 @@ services:
       # Render genera una clave secreta segura solo.
       - key: FLASK_SECRET_KEY
         generateValue: true
+      # Contraseña de acceso a la app (cargala a mano en el panel de Render).
+      - key: APP_PASSWORD
+        sync: false
       # Versión de Python a usar en el deploy.
       - key: PYTHON_VERSION
         value: "3.12.10"
