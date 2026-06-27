@@ -649,6 +649,7 @@
   const resultModal = $("result-modal");
   let resultCopyText = "";
   let currentIcsTasks = null;
+  let resultIsImage = false;
 
   function showResult(
     title,
@@ -663,6 +664,8 @@
     $("result-copy").classList.toggle("hidden", loading);
     currentIcsTasks = icsTasks;
     $("result-ics").classList.toggle("hidden", !(icsTasks && icsTasks.length));
+    resultIsImage = mermaid !== null;
+    $("result-png").classList.toggle("hidden", mermaid === null || loading);
     if (text !== null) {
       $("result-text").textContent = text;
       $("result-text").classList.remove("hidden");
@@ -685,11 +688,73 @@
   $("result-close").addEventListener("click", closeResult);
   $("result-backdrop").addEventListener("click", closeResult);
   $("result-copy").addEventListener("click", async () => {
+    if (resultIsImage) {
+      await copyMindmapImage();
+      return;
+    }
     try {
       await navigator.clipboard.writeText(resultCopyText);
       toast("Copiado");
     } catch {
       toast("No se pudo copiar", true);
+    }
+  });
+
+  // Convierte el SVG del mapa mental en una imagen PNG (con fondo de la app).
+  function svgToPngBlob(svg, scale = 2) {
+    return new Promise((resolve, reject) => {
+      const vb = svg.viewBox && svg.viewBox.baseVal;
+      const rect = svg.getBoundingClientRect();
+      const w = (vb && vb.width) || rect.width || 800;
+      const h = (vb && vb.height) || rect.height || 600;
+      const xml = new XMLSerializer().serializeToString(svg);
+      const src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(xml)));
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(w * scale);
+        canvas.height = Math.round(h * scale);
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#0b1020";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob"))), "image/png");
+      };
+      img.onerror = reject;
+      img.src = src;
+    });
+  }
+
+  async function copyMindmapImage() {
+    const svg = $("result-mermaid").querySelector("svg");
+    if (!svg) return;
+    try {
+      const blob = await svgToPngBlob(svg);
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      toast("Imagen copiada ✓");
+    } catch {
+      toast("Tu navegador no deja copiar imágenes; usá 'Descargar imagen'", true);
+    }
+  }
+
+  $("result-png").addEventListener("click", async () => {
+    const svg = $("result-mermaid").querySelector("svg");
+    if (!svg) return;
+    try {
+      const blob = await svgToPngBlob(svg);
+      const file = new File([blob], "mapa-mental.png", { type: "image/png" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: "Mapa mental" });
+        return;
+      }
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "mapa-mental.png";
+      a.click();
+      URL.revokeObjectURL(a.href);
+      toast("Imagen descargada");
+    } catch {
+      toast("No se pudo generar la imagen", true);
     }
   });
 
