@@ -133,3 +133,84 @@ def delete_session(db_path, session_id):
             return cur.rowcount > 0
     finally:
         conn.close()
+
+
+# ---------- Flashcards (repaso espaciado) ----------
+def _due_clause():
+    """Comparación 'vence hoy o antes', según el backend."""
+    return "due_date <= %s::date" if IS_POSTGRES else "due_date <= ?"
+
+
+def save_flashcards(db_path, cards, session_id=None):
+    """Guarda una lista de tarjetas. Devuelve cuántas se guardaron."""
+    conn = get_connection(db_path)
+    try:
+        with conn:
+            for c in cards:
+                conn.execute(
+                    _q("INSERT INTO flashcards (session_id, question, answer) VALUES (?, ?, ?)"),
+                    (session_id, c["question"], c["answer"]),
+                )
+        return len(cards)
+    finally:
+        conn.close()
+
+
+def list_due_flashcards(db_path, today_iso, limit=50):
+    """Tarjetas que toca repasar hoy (o antes)."""
+    conn = get_connection(db_path)
+    try:
+        sql = (
+            "SELECT id, question, answer, easiness, interval_days, repetitions "
+            f"FROM flashcards WHERE {_due_clause()} ORDER BY due_date, id LIMIT {int(limit)}"
+        )
+        rows = conn.execute(sql, (today_iso,)).fetchall()
+        return [_to_dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def get_flashcard(db_path, card_id):
+    """Devuelve una tarjeta con su estado SM-2, o None."""
+    conn = get_connection(db_path)
+    try:
+        row = conn.execute(
+            _q(
+                "SELECT id, question, answer, easiness, interval_days, repetitions, due_date "
+                "FROM flashcards WHERE id = ?"
+            ),
+            (card_id,),
+        ).fetchone()
+        return _to_dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def update_flashcard_srs(db_path, card_id, repetitions, easiness, interval_days, due_iso):
+    """Actualiza el estado de repaso de una tarjeta tras calificarla."""
+    conn = get_connection(db_path)
+    try:
+        with conn:
+            cur = conn.execute(
+                _q(
+                    "UPDATE flashcards SET repetitions = ?, easiness = ?, "
+                    "interval_days = ?, due_date = ? WHERE id = ?"
+                ),
+                (repetitions, easiness, interval_days, due_iso, card_id),
+            )
+            return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+def flashcard_stats(db_path, today_iso):
+    """Totales: cuántas tarjetas hay y cuántas vencen hoy."""
+    conn = get_connection(db_path)
+    try:
+        total = conn.execute("SELECT COUNT(*) AS n FROM flashcards").fetchone()["n"]
+        due = conn.execute(
+            f"SELECT COUNT(*) AS n FROM flashcards WHERE {_due_clause()}", (today_iso,)
+        ).fetchone()["n"]
+        return {"total": total, "due": due}
+    finally:
+        conn.close()

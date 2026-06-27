@@ -91,10 +91,17 @@
           <p class="text-xs text-slate-400 -mt-0.5">Grabá tu clase · charlá con la IA</p>
         </div>
       </div>
-      <button id="open-sessions" class="glass hover:bg-white/10 transition rounded-xl px-4 py-2 text-sm font-medium flex items-center gap-2">
-        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18M3 12h18M3 17h18"/></svg>
-        Mis sesiones
-      </button>
+      <div class="flex items-center gap-2">
+        <button id="open-study" class="relative glass hover:bg-white/10 transition rounded-xl px-4 py-2 text-sm font-medium flex items-center gap-2">
+          <svg class="h-4 w-4 text-purple-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          Estudiar
+          <span id="study-due-badge" class="hidden absolute -top-2 -right-2 grad-bg text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center"></span>
+        </button>
+        <button id="open-sessions" class="glass hover:bg-white/10 transition rounded-xl px-4 py-2 text-sm font-medium flex items-center gap-2">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18M3 12h18M3 17h18"/></svg>
+          Mis sesiones
+        </button>
+      </div>
     </header>
 
     <!-- Aviso de navegador sin soporte -->
@@ -160,6 +167,9 @@
 
         <!-- Mapa mental -->
         <button id="btn-mindmap" class="grad-bg hover:opacity-90 transition rounded-xl px-3 py-2 text-sm font-medium">Mapa mental</button>
+
+        <!-- Flashcards -->
+        <button id="btn-flashcards" class="grad-bg hover:opacity-90 transition rounded-xl px-3 py-2 text-sm font-medium">Flashcards</button>
 
         <span class="hidden sm:block w-px h-7 bg-white/10 mx-1"></span>
 
@@ -293,6 +303,86 @@
       <div id="result-mermaid" class="hidden flex-1 overflow-auto rounded-xl bg-black/20 p-4 grid place-items-center"></div>
       <div class="flex gap-2 mt-4">
         <button id="result-copy" class="glass hover:bg-white/10 transition rounded-xl px-4 py-2 text-sm font-medium">Copiar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: flashcards generadas (preview + guardar mazo) -->
+  <div id="fc-modal" class="hidden fixed inset-0 z-50 grid place-items-center p-4">
+    <div class="absolute inset-0 bg-black/60" id="fc-backdrop"></div>
+    <div class="glass rounded-2xl p-6 w-full max-w-2xl relative fade-in max-h-[88vh] flex flex-col">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-lg">Flashcards generadas</h3>
+        <button id="fc-close" class="text-slate-400 hover:text-white transition">
+          <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div id="fc-loading" class="hidden flex-1 grid place-items-center py-12">
+        <div class="text-center">
+          <div class="typing inline-flex"><span></span><span></span><span></span></div>
+          <p class="text-slate-400 text-sm mt-3">Generando tarjetas con Claude...</p>
+        </div>
+      </div>
+      <div id="fc-list" class="hidden flex-1 overflow-y-auto space-y-2 pr-1"></div>
+      <div id="fc-actions" class="hidden flex gap-2 mt-4">
+        <button id="fc-save" class="grad-bg hover:opacity-90 transition rounded-xl px-4 py-2.5 text-sm font-semibold flex-1">Guardar mazo</button>
+        <button id="fc-cancel" class="glass hover:bg-white/10 transition rounded-xl px-4 py-2.5 text-sm font-medium text-slate-300">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: modo repaso (estudiar) -->
+  <div id="study-modal" class="hidden fixed inset-0 z-50 grid place-items-center p-4">
+    <div class="absolute inset-0 bg-black/70" id="study-backdrop"></div>
+    <div class="glass rounded-2xl p-6 w-full max-w-xl relative fade-in flex flex-col" style="min-height:380px">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-lg">Repaso</h3>
+        <div class="flex items-center gap-3">
+          <span id="study-progress" class="text-xs text-slate-400"></span>
+          <button id="study-close" class="text-slate-400 hover:text-white transition">
+            <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Estado vacío / fin -->
+      <div id="study-empty" class="hidden flex-1 grid place-items-center text-center">
+        <div>
+          <div class="text-5xl mb-3">🎉</div>
+          <p class="font-semibold">¡Estás al día!</p>
+          <p class="text-slate-400 text-sm mt-1">No hay tarjetas para repasar por ahora.</p>
+        </div>
+      </div>
+
+      <!-- Tarjeta -->
+      <div id="study-card" class="hidden flex-1 flex flex-col">
+        <div class="flex-1 grid place-items-center rounded-2xl bg-black/20 p-6 text-center">
+          <div>
+            <p class="text-[11px] uppercase tracking-wide text-slate-500 mb-2">Pregunta</p>
+            <p id="study-question" class="text-lg font-medium"></p>
+            <div id="study-answer-wrap" class="hidden mt-5 pt-5 border-t border-white/10">
+              <p class="text-[11px] uppercase tracking-wide text-slate-500 mb-2">Respuesta</p>
+              <p id="study-answer" class="text-slate-200"></p>
+            </div>
+          </div>
+        </div>
+
+        <button id="study-show" class="grad-bg hover:opacity-90 transition rounded-xl py-3 font-semibold mt-4">Mostrar respuesta</button>
+
+        <div id="study-grades" class="hidden grid grid-cols-4 gap-2 mt-4">
+          <button data-q="0" class="study-grade glass hover:bg-white/10 transition rounded-xl py-2.5 text-sm font-medium">
+            Otra vez <span class="block text-[10px] text-slate-500">&lt;1 día</span>
+          </button>
+          <button data-q="3" class="study-grade glass hover:bg-white/10 transition rounded-xl py-2.5 text-sm font-medium">
+            Difícil
+          </button>
+          <button data-q="4" class="study-grade glass hover:bg-white/10 transition rounded-xl py-2.5 text-sm font-medium">
+            Bien
+          </button>
+          <button data-q="5" class="study-grade glass hover:bg-white/10 transition rounded-xl py-2.5 text-sm font-medium">
+            Fácil
+          </button>
+        </div>
       </div>
     </div>
   </div>

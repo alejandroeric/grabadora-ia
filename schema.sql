@@ -18,3 +18,19 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);
+
+-- Tarjetas de estudio con datos de repaso espaciado (SM-2).
+CREATE TABLE IF NOT EXISTS flashcards (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id   INTEGER,
+    question     TEXT NOT NULL,
+    answer       TEXT NOT NULL,
+    easiness     REAL NOT NULL DEFAULT 2.5,
+    interval_days INTEGER NOT NULL DEFAULT 0,
+    repetitions  INTEGER NOT NULL DEFAULT 0,
+    due_date     TEXT NOT NULL DEFAULT (date('now')),
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_flashcards_due ON flashcards(due_date);

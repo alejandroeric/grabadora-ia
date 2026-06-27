@@ -2,7 +2,7 @@
 
 No tiene lógica de SQLite ni de IA adentro: solo orquesta.
 """
-from datetime import timedelta
+from datetime import date, timedelta
 
 from flask import (
     Flask,
@@ -18,15 +18,24 @@ from config import Config
 from security import rate_limit, require_auth
 from db import (
     delete_session,
+    flashcard_stats,
+    get_flashcard,
     get_session,
     init_db,
+    list_due_flashcards,
     list_sessions,
+    save_flashcards,
     save_session,
+    update_flashcard_srs,
 )
 from services import anthropic_client
+from srs import sm2
 from validation import (
     ValidationError,
     validate_chat_input,
+    validate_flashcards_gen_input,
+    validate_flashcards_save_input,
+    validate_grade_input,
     validate_mindmap_input,
     validate_session_input,
     validate_summary_input,
@@ -144,6 +153,71 @@ def create_app(overrides=None):
         except Exception:
             return jsonify({"error": "No se pudo generar el mapa mental. Revisá la API key."}), 502
         return jsonify({"mermaid": code})
+
+    # --- Flashcards: generar con IA ---
+    @app.post("/api/flashcards/generate")
+    @require_auth
+    @rate_limit(30, 60)
+    def flashcards_generate():
+        try:
+            data = validate_flashcards_gen_input(request.get_json(silent=True))
+        except ValidationError as e:
+            return jsonify({"error": str(e)}), 400
+        try:
+            cards = anthropic_client.generate_flashcards(
+                data["transcript"], data["count"], glossary=data["glossary"]
+            )
+        except Exception:
+            return jsonify({"error": "No se pudieron generar las tarjetas. Probá de nuevo."}), 502
+        if not cards:
+            return jsonify({"error": "La IA no devolvió tarjetas válidas. Probá de nuevo."}), 502
+        return jsonify({"cards": cards})
+
+    # --- Flashcards: guardar mazo ---
+    @app.post("/api/flashcards")
+    @require_auth
+    def flashcards_save():
+        try:
+            data = validate_flashcards_save_input(request.get_json(silent=True))
+        except ValidationError as e:
+            return jsonify({"error": str(e)}), 400
+        saved = save_flashcards(db_path(), data["cards"])
+        return jsonify({"saved": saved}), 201
+
+    # --- Flashcards: las que toca repasar hoy ---
+    @app.get("/api/flashcards/due")
+    @require_auth
+    def flashcards_due():
+        today = date.today().isoformat()
+        return jsonify(
+            {
+                "cards": list_due_flashcards(db_path(), today),
+                "stats": flashcard_stats(db_path(), today),
+            }
+        )
+
+    # --- Flashcards: calificar una tarjeta (SM-2) ---
+    @app.post("/api/flashcards/<int:card_id>/grade")
+    @require_auth
+    def flashcards_grade(card_id):
+        try:
+            data = validate_grade_input(request.get_json(silent=True))
+        except ValidationError as e:
+            return jsonify({"error": str(e)}), 400
+        card = get_flashcard(db_path(), card_id)
+        if card is None:
+            return jsonify({"error": "Tarjeta no encontrada."}), 404
+        nxt = sm2(data["quality"], card["repetitions"], card["easiness"], card["interval_days"])
+        due = (date.today() + timedelta(days=nxt["interval_days"])).isoformat()
+        update_flashcard_srs(
+            db_path(),
+            card_id,
+            nxt["repetitions"],
+            nxt["easiness"],
+            nxt["interval_days"],
+            due,
+        )
+        return jsonify({"ok": True, "due_date": due, "interval_days": nxt["interval_days"]})
 
     # --- Guardar una sesión en SQLite ---
     @app.post("/api/sessions")

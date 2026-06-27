@@ -115,3 +115,45 @@ def validate_mindmap_input(data):
     _require_dict(data)
     transcript = _require_transcript(data)
     return {"transcript": transcript, "glossary": _clean_glossary(data)}
+
+
+def validate_flashcards_gen_input(data):
+    """Valida el body para generar flashcards con IA."""
+    _require_dict(data)
+    transcript = _require_transcript(data)
+    try:
+        count = int(data.get("count", 8))
+    except (TypeError, ValueError):
+        raise ValidationError("Cantidad de tarjetas inválida.")
+    count = max(1, min(20, count))
+    return {"transcript": transcript, "count": count, "glossary": _clean_glossary(data)}
+
+
+def validate_flashcards_save_input(data):
+    """Valida el body para guardar un mazo de flashcards."""
+    _require_dict(data)
+    cards = data.get("cards")
+    if not isinstance(cards, list) or not cards:
+        raise ValidationError("No hay tarjetas para guardar.")
+    clean = []
+    for c in cards:
+        if not isinstance(c, dict):
+            raise ValidationError("Tarjeta inválida.")
+        question = (c.get("question") or "").strip()
+        answer = (c.get("answer") or "").strip()
+        if not question or not answer:
+            raise ValidationError("Cada tarjeta necesita pregunta y respuesta.")
+        clean.append({"question": question[:2000], "answer": answer[:4000]})
+    return {"cards": clean}
+
+
+def validate_grade_input(data):
+    """Valida la calificación de una tarjeta (0-5)."""
+    _require_dict(data)
+    try:
+        quality = int(data.get("quality"))
+    except (TypeError, ValueError):
+        raise ValidationError("Calificación inválida.")
+    if quality < 0 or quality > 5:
+        raise ValidationError("La calificación debe estar entre 0 y 5.")
+    return {"quality": quality}

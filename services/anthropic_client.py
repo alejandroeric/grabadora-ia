@@ -3,6 +3,8 @@
 Concentra todas las tareas de IA: chat, resumen por plantilla, traducción
 y mapa mental. Cada función acepta un `client` inyectado para mockear en tests.
 """
+import json
+
 from anthropic import Anthropic
 
 from config import Config
@@ -112,3 +114,31 @@ def mindmap(transcript, glossary=None, client=None):
         [{"role": "user", "content": prompt}], _system(glossary), client, max_tokens=1200
     )
     return _strip_fences(text)
+
+
+def generate_flashcards(transcript, count=8, glossary=None, client=None):
+    """Genera tarjetas de estudio (pregunta/respuesta) a partir del transcript.
+
+    Devuelve una lista de dicts {"question", "answer"}. Lanza excepción si la
+    IA no devuelve un JSON parseable.
+    """
+    prompt = (
+        f"{_transcript_context(transcript)}\n\n"
+        f"Generá {count} tarjetas de estudio (flashcards) sobre los conceptos más "
+        "importantes. Cada tarjeta debe tener una pregunta clara y una respuesta concisa. "
+        "Devolvé SOLO un array JSON válido, sin texto adicional y sin comillas triples, "
+        'con este formato exacto: [{"question": "...", "answer": "..."}]'
+    )
+    text = _strip_fences(
+        _complete([{"role": "user", "content": prompt}], _system(glossary), client, max_tokens=2000)
+    )
+    data = json.loads(text)
+    cards = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        q = (item.get("question") or "").strip()
+        a = (item.get("answer") or "").strip()
+        if q and a:
+            cards.append({"question": q, "answer": a})
+    return cards

@@ -614,10 +614,168 @@
     window.print();
   });
 
+  // ---------- Flashcards: generar y guardar ----------
+  let generatedCards = [];
+
+  function closeFcModal() {
+    $("fc-modal").classList.add("hidden");
+  }
+
+  function renderGeneratedCards() {
+    const list = $("fc-list");
+    list.innerHTML = "";
+    generatedCards.forEach((c, i) => {
+      const el = document.createElement("div");
+      el.className = "glass rounded-xl p-3";
+      el.innerHTML =
+        '<p class="text-sm font-medium">' + (i + 1) + ". " + escapeHtml(c.question) + "</p>" +
+        '<p class="text-sm text-slate-400 mt-1">' + escapeHtml(c.answer) + "</p>";
+      list.appendChild(el);
+    });
+  }
+
+  async function doFlashcards() {
+    if (!requireTranscript()) return;
+    $("fc-modal").classList.remove("hidden");
+    $("fc-loading").classList.remove("hidden");
+    $("fc-list").classList.add("hidden");
+    $("fc-actions").classList.add("hidden");
+    try {
+      const d = await apiPost("/api/flashcards/generate", {
+        transcript: finalTranscript,
+        glossary: getGlossary(),
+        count: 8,
+      });
+      generatedCards = d.cards || [];
+      renderGeneratedCards();
+      $("fc-loading").classList.add("hidden");
+      $("fc-list").classList.remove("hidden");
+      $("fc-actions").classList.remove("hidden");
+    } catch (e) {
+      closeFcModal();
+      toast(e.message, true);
+    }
+  }
+
+  $("btn-flashcards").addEventListener("click", doFlashcards);
+  $("fc-close").addEventListener("click", closeFcModal);
+  $("fc-cancel").addEventListener("click", closeFcModal);
+  $("fc-backdrop").addEventListener("click", closeFcModal);
+  $("fc-save").addEventListener("click", async () => {
+    if (!generatedCards.length) return;
+    try {
+      const d = await apiPost("/api/flashcards", { cards: generatedCards });
+      closeFcModal();
+      toast(d.saved + " tarjetas guardadas ✓");
+      refreshDueBadge();
+    } catch (e) {
+      toast(e.message, true);
+    }
+  });
+
+  // ---------- Estudiar (repaso espaciado) ----------
+  let studyQueue = [];
+  let studyIndex = 0;
+  let studyTotal = 0;
+
+  async function refreshDueBadge() {
+    try {
+      const res = await fetch("/api/flashcards/due");
+      if (!res.ok) return;
+      const d = await res.json();
+      const due = d.stats ? d.stats.due : 0;
+      const badge = $("study-due-badge");
+      if (due > 0) {
+        badge.textContent = due;
+        badge.classList.remove("hidden");
+      } else {
+        badge.classList.add("hidden");
+      }
+    } catch {
+      /* sin badge si falla */
+    }
+  }
+
+  function showStudyCard() {
+    const card = studyQueue[studyIndex];
+    $("study-card").classList.remove("hidden");
+    $("study-question").textContent = card.question;
+    $("study-answer").textContent = card.answer;
+    $("study-answer-wrap").classList.add("hidden");
+    $("study-grades").classList.add("hidden");
+    $("study-show").classList.remove("hidden");
+    $("study-progress").textContent = studyIndex + 1 + " / " + studyTotal;
+  }
+
+  function finishStudy() {
+    $("study-card").classList.add("hidden");
+    $("study-empty").classList.remove("hidden");
+    $("study-progress").textContent = "";
+    refreshDueBadge();
+  }
+
+  async function openStudy() {
+    $("study-modal").classList.remove("hidden");
+    $("study-card").classList.add("hidden");
+    $("study-empty").classList.add("hidden");
+    $("study-progress").textContent = "";
+    try {
+      const res = await fetch("/api/flashcards/due");
+      if (res.status === 401) {
+        window.location = "/login";
+        return;
+      }
+      const d = await res.json();
+      studyQueue = d.cards || [];
+      studyTotal = studyQueue.length;
+      studyIndex = 0;
+      if (!studyQueue.length) {
+        $("study-empty").classList.remove("hidden");
+      } else {
+        showStudyCard();
+      }
+    } catch {
+      toast("No se pudieron cargar las tarjetas", true);
+    }
+  }
+
+  function closeStudy() {
+    $("study-modal").classList.add("hidden");
+    refreshDueBadge();
+  }
+
+  $("open-study").addEventListener("click", openStudy);
+  $("study-close").addEventListener("click", closeStudy);
+  $("study-backdrop").addEventListener("click", closeStudy);
+  $("study-show").addEventListener("click", () => {
+    $("study-answer-wrap").classList.remove("hidden");
+    $("study-show").classList.add("hidden");
+    $("study-grades").classList.remove("hidden");
+  });
+  document.querySelectorAll(".study-grade").forEach((b) => {
+    b.addEventListener("click", async () => {
+      const card = studyQueue[studyIndex];
+      const quality = parseInt(b.dataset.q, 10);
+      try {
+        await apiPost("/api/flashcards/" + card.id + "/grade", { quality });
+      } catch (e) {
+        toast(e.message, true);
+        return;
+      }
+      studyIndex++;
+      if (studyIndex >= studyQueue.length) {
+        finishStudy();
+      } else {
+        showStudyCard();
+      }
+    });
+  });
+
   // ---------- Init ----------
   if (window.mermaid) {
     window.mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "loose" });
   }
   loadGlossary();
+  refreshDueBadge();
   setupRecognition();
 })();
