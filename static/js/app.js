@@ -66,6 +66,8 @@
   let transcribeChain = Promise.resolve();
   let pendingChunks = 0;
   const SEGMENT_MS = 10000; // largo de cada fragmento que se transcribe
+  let transcriptLang = "original"; // idioma mostrado en el recuadro
+  let translationCache = {}; // { español: "...", inglés: "..." }
 
   function supportsRecording() {
     return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
@@ -89,9 +91,57 @@
 
   function renderTranscript() {
     if (hasTranscript()) transcriptEmpty.classList.add("hidden");
-    transcriptFinal.textContent = finalTranscript;
-    transcriptInterim.textContent = pendingChunks > 0 ? " ⏳ transcribiendo..." : "";
+    // Solo refrescamos el texto en vivo cuando estamos viendo el original.
+    if (transcriptLang === "original") {
+      transcriptFinal.textContent = finalTranscript;
+      transcriptInterim.textContent = pendingChunks > 0 ? " ⏳ transcribiendo..." : "";
+    }
     transcriptBox.scrollTop = transcriptBox.scrollHeight;
+  }
+
+  function resetTranscriptLang() {
+    transcriptLang = "original";
+    translationCache = {};
+    const sel = $("transcript-lang");
+    if (sel) {
+      sel.value = "original";
+      sel.classList.add("hidden");
+    }
+  }
+
+  function showTranscriptLangToggle() {
+    const sel = $("transcript-lang");
+    if (sel && hasTranscript()) sel.classList.remove("hidden");
+  }
+
+  async function onTranscriptLangChange() {
+    const sel = $("transcript-lang");
+    const lang = sel.value;
+    transcriptLang = lang;
+    transcriptInterim.textContent = "";
+    if (lang === "original") {
+      transcriptFinal.textContent = finalTranscript;
+      return;
+    }
+    if (translationCache[lang]) {
+      transcriptFinal.textContent = translationCache[lang];
+      return;
+    }
+    transcriptFinal.textContent = "Traduciendo a " + lang + "...";
+    try {
+      const d = await apiPost("/api/translate", {
+        transcript: finalTranscript,
+        target: lang,
+        glossary: getGlossary(),
+      });
+      translationCache[lang] = d.translation;
+      if (transcriptLang === lang) transcriptFinal.textContent = d.translation;
+    } catch (e) {
+      toast(e.message, true);
+      sel.value = "original";
+      transcriptLang = "original";
+      transcriptFinal.textContent = finalTranscript;
+    }
   }
 
   // ---------- Control de grabación ----------
@@ -170,6 +220,7 @@
     }
     finalTranscript = "";
     chatHistory = [];
+    resetTranscriptLang();
     renderChat();
     renderTranscript();
     actions.classList.add("hidden");
@@ -199,6 +250,7 @@
       statusText.textContent = "Grabación lista";
       actions.classList.remove("hidden");
       copyBtn.classList.remove("hidden");
+      showTranscriptLangToggle();
       enableChat(true);
     } else {
       statusDot.className = "h-2.5 w-2.5 rounded-full bg-slate-500";
@@ -399,8 +451,12 @@
 
   // ---------- Copiar transcript ----------
   copyBtn.addEventListener("click", async () => {
+    const text =
+      transcriptLang === "original"
+        ? finalTranscript
+        : translationCache[transcriptLang] || finalTranscript;
     try {
-      await navigator.clipboard.writeText(finalTranscript.trim());
+      await navigator.clipboard.writeText(text.trim());
       toast("Transcripción copiada");
     } catch {
       toast("No se pudo copiar", true);
@@ -417,6 +473,7 @@
   function resetAll() {
     finalTranscript = "";
     chatHistory = [];
+    resetTranscriptLang();
     renderTranscript();
     transcriptEmpty.classList.remove("hidden");
     renderChat();
@@ -539,11 +596,13 @@
       }
       finalTranscript = s.transcript + " ";
       chatHistory = (s.messages || []).map((m) => ({ role: m.role, content: m.content }));
+      resetTranscriptLang();
       renderTranscript();
       transcriptEmpty.classList.add("hidden");
       renderChat();
       actions.classList.add("hidden");
       copyBtn.classList.remove("hidden");
+      showTranscriptLangToggle();
       enableChat(true);
       statusDot.className = "h-2.5 w-2.5 rounded-full bg-indigo-400";
       statusText.textContent = "Sesión guardada";
@@ -911,6 +970,7 @@
   // ---------- Init ----------
   setupCollapse("tools-toggle", "tools-content", "tools-chevron");
   setupCollapse("chat-toggle", "chat-content", "chat-chevron");
+  $("transcript-lang").addEventListener("change", onTranscriptLangChange);
   if (window.mermaid) {
     window.mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "loose" });
   }
