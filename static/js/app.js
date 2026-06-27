@@ -829,6 +829,9 @@
   if (window.mermaid) {
     window.mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "loose" });
   }
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  }
   loadGlossary();
   refreshDueBadge();
   setupRecognition();

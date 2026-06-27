@@ -9,9 +9,11 @@ from flask import (
     Flask,
     Response,
     jsonify,
+    make_response,
     redirect,
     render_template,
     request,
+    send_from_directory,
     session,
     url_for,
 )
@@ -78,6 +80,14 @@ def create_app(overrides=None):
     def logout():
         session.pop("authed", None)
         return redirect(url_for("login"))
+
+    # --- Service worker (servido desde la raíz para alcance global) ---
+    @app.get("/sw.js")
+    def service_worker():
+        resp = make_response(send_from_directory(app.static_folder, "sw.js"))
+        resp.headers["Content-Type"] = "application/javascript"
+        resp.headers["Service-Worker-Allowed"] = "/"
+        return resp
 
     # --- Página principal ---
     @app.get("/")
