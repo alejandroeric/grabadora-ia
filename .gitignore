@@ -1,0 +1,27 @@
+# Secrets / entorno — NUNCA se commitea
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Base de datos SQLite (incluye archivos de WAL mode)
+*.db
+*.db-wal
+*.db-shm
+*.sqlite3
+
+# Tests / cobertura
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Sistema operativo / editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
