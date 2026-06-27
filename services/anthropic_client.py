@@ -155,3 +155,89 @@ def generate_flashcards(transcript, count=8, glossary=None, client=None):
         if q and a:
             cards.append({"question": q, "answer": a})
     return cards
+
+
+def polish_transcript(transcript, glossary=None, client=None):
+    """Devuelve la transcripción pulida (puntuación, mayúsculas, sin muletillas)."""
+    prompt = (
+        f"{_transcript_context(transcript)}\n\n"
+        "Devolvé la MISMA transcripción pero pulida: corregí puntuación, mayúsculas y "
+        "ortografía, sacá muletillas y repeticiones innecesarias ('eh', 'este', 'o sea'), y "
+        "corregí términos técnicos mal transcriptos. NO resumas, NO cambies el contenido ni el "
+        "idioma. Devolvé SOLO el texto pulido, sin comentarios ni comillas."
+    )
+    return _complete(
+        [{"role": "user", "content": prompt}], _system(glossary), client, max_tokens=4000
+    ).strip()
+
+
+def extract_tasks(transcript, glossary=None, client=None):
+    """Extrae tareas/fechas como lista de {'task', 'due'}."""
+    prompt = (
+        f"{_transcript_context(transcript)}\n\n"
+        "Extraé las tareas, entregas y fechas importantes mencionadas. Devolvé SOLO un array "
+        'JSON, sin texto extra ni comillas triples, con objetos {"task": "descripción corta", '
+        '"due": "fecha o plazo si se menciona, si no cadena vacía"}. Si no hay tareas, devolvé [].'
+    )
+    text = _strip_fences(
+        _complete([{"role": "user", "content": prompt}], _system(glossary), client, max_tokens=1500)
+    )
+    out = []
+    for it in json.loads(text):
+        if isinstance(it, dict) and (it.get("task") or "").strip():
+            out.append({"task": it["task"].strip(), "due": (it.get("due") or "").strip()})
+    return out
+
+
+def generate_quiz(transcript, count=5, glossary=None, client=None):
+    """Genera un cuestionario de opción múltiple."""
+    prompt = (
+        f"{_transcript_context(transcript)}\n\n"
+        f"Generá un cuestionario de {count} preguntas de opción múltiple sobre los conceptos "
+        "clave. Devolvé SOLO un array JSON, sin texto extra ni comillas triples, con objetos: "
+        '{"question": "...", "options": ["a","b","c","d"], "correct": 0, "explanation": "..."}. '
+        "'correct' es el índice (0-3) de la opción correcta."
+    )
+    text = _strip_fences(
+        _complete([{"role": "user", "content": prompt}], _system(glossary), client, max_tokens=2500)
+    )
+    quiz = []
+    for it in json.loads(text):
+        if not isinstance(it, dict):
+            continue
+        q = (it.get("question") or "").strip()
+        opts = it.get("options")
+        if not q or not isinstance(opts, list) or len(opts) < 2:
+            continue
+        try:
+            correct = int(it.get("correct", 0))
+        except (TypeError, ValueError):
+            correct = 0
+        correct = max(0, min(len(opts) - 1, correct))
+        quiz.append(
+            {
+                "question": q,
+                "options": [str(o) for o in opts],
+                "correct": correct,
+                "explanation": (it.get("explanation") or "").strip(),
+            }
+        )
+    return quiz
+
+
+def comparison_table(transcript, glossary=None, client=None):
+    """Arma un cuadro comparativo: {'title', 'headers', 'rows'}."""
+    prompt = (
+        f"{_transcript_context(transcript)}\n\n"
+        "Armá un cuadro comparativo / sinóptico de los conceptos principales. Devolvé SOLO un "
+        "objeto JSON, sin texto extra ni comillas triples: "
+        '{"title": "título", "headers": ["Col1","Col2"], "rows": [["...","..."]]}. '
+        "Elegí columnas que tengan sentido para comparar (ej: Concepto, Definición, Ejemplo)."
+    )
+    text = _strip_fences(
+        _complete([{"role": "user", "content": prompt}], _system(glossary), client, max_tokens=2000)
+    )
+    data = json.loads(text)
+    headers = [str(h) for h in (data.get("headers") or [])]
+    rows = [[str(c) for c in r] for r in (data.get("rows") or []) if isinstance(r, list)]
+    return {"title": (data.get("title") or "Cuadro comparativo").strip(), "headers": headers, "rows": rows}

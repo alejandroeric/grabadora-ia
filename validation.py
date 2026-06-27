@@ -157,3 +157,21 @@ def validate_grade_input(data):
     if quality < 0 or quality > 5:
         raise ValidationError("La calificación debe estar entre 0 y 5.")
     return {"quality": quality}
+
+
+def validate_text_tool_input(data):
+    """Valida herramientas que solo necesitan el transcript (pulir, tareas, cuadro)."""
+    _require_dict(data)
+    return {"transcript": _require_transcript(data), "glossary": _clean_glossary(data)}
+
+
+def validate_quiz_input(data):
+    """Valida la generación de cuestionario."""
+    _require_dict(data)
+    transcript = _require_transcript(data)
+    try:
+        count = int(data.get("count", 5))
+    except (TypeError, ValueError):
+        raise ValidationError("Cantidad de preguntas inválida.")
+    count = max(1, min(15, count))
+    return {"transcript": transcript, "count": count, "glossary": _clean_glossary(data)}

@@ -648,18 +648,30 @@
   // ---------- Modal de resultado ----------
   const resultModal = $("result-modal");
   let resultCopyText = "";
+  let currentIcsTasks = null;
 
-  function showResult(title, { loading = false, text = null, mermaid = null } = {}) {
+  function showResult(
+    title,
+    { loading = false, text = null, mermaid = null, html = null, copyText = null, icsTasks = null } = {}
+  ) {
     $("result-title").textContent = title;
     resultModal.classList.remove("hidden");
     $("result-loading").classList.toggle("hidden", !loading);
     $("result-text").classList.add("hidden");
+    $("result-html").classList.add("hidden");
     $("result-mermaid").classList.add("hidden");
     $("result-copy").classList.toggle("hidden", loading);
+    currentIcsTasks = icsTasks;
+    $("result-ics").classList.toggle("hidden", !(icsTasks && icsTasks.length));
     if (text !== null) {
       $("result-text").textContent = text;
       $("result-text").classList.remove("hidden");
       resultCopyText = text;
+    }
+    if (html !== null) {
+      $("result-html").innerHTML = html;
+      $("result-html").classList.remove("hidden");
+      resultCopyText = copyText || "";
     }
     if (mermaid !== null) {
       renderMermaid(mermaid);
@@ -679,6 +691,35 @@
     } catch {
       toast("No se pudo copiar", true);
     }
+  });
+
+  function buildIcs(tasks) {
+    const pad = (n) => String(n).padStart(2, "0");
+    let ics = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//NotaIA//ES\r\n";
+    tasks.forEach((t, i) => {
+      let d = new Date(t.due);
+      if (isNaN(d.getTime())) d = new Date();
+      const dt = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+      ics += "BEGIN:VEVENT\r\n";
+      ics += `UID:notaia-${Date.now()}-${i}@notaia\r\n`;
+      ics += `DTSTART;VALUE=DATE:${dt}\r\n`;
+      ics += `SUMMARY:${(t.task || "").replace(/[\r\n]+/g, " ")}\r\n`;
+      if (t.due) ics += `DESCRIPTION:Vence: ${t.due.replace(/[\r\n]+/g, " ")}\r\n`;
+      ics += "END:VEVENT\r\n";
+    });
+    ics += "END:VCALENDAR\r\n";
+    return ics;
+  }
+
+  $("result-ics").addEventListener("click", () => {
+    if (!currentIcsTasks || !currentIcsTasks.length) return;
+    const blob = new Blob([buildIcs(currentIcsTasks)], { type: "text/calendar;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "tareas.ics";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast("Calendario .ics descargado");
   });
 
   async function renderMermaid(code) {
@@ -966,6 +1007,180 @@
       if (ch) ch.classList.toggle("rotate-180", !nowHidden);
     });
   }
+
+  // ---------- Pulir texto ----------
+  async function doPolish() {
+    if (!requireTranscript()) return;
+    const btn = $("btn-polish");
+    btn.disabled = true;
+    btn.textContent = "Puliendo...";
+    try {
+      const d = await apiPost("/api/polish", {
+        transcript: finalTranscript,
+        glossary: getGlossary(),
+      });
+      finalTranscript = d.polished.endsWith(" ") ? d.polished : d.polished + " ";
+      translationCache = {};
+      transcriptLang = "original";
+      const sel = $("transcript-lang");
+      if (sel) sel.value = "original";
+      renderTranscript();
+      toast("Texto pulido ✓");
+    } catch (e) {
+      toast(e.message, true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Pulir texto";
+    }
+  }
+
+  // ---------- Tareas y fechas ----------
+  async function doTasks() {
+    if (!requireTranscript()) return;
+    showResult("Tareas y fechas", { loading: true });
+    try {
+      const d = await apiPost("/api/tasks", {
+        transcript: finalTranscript,
+        glossary: getGlossary(),
+      });
+      const items = d.tasks || [];
+      if (!items.length) {
+        showResult("Tareas y fechas", {
+          html: '<p class="text-slate-400">No se detectaron tareas ni fechas en esta clase.</p>',
+        });
+        return;
+      }
+      const rows = items
+        .map(
+          (t) =>
+            `<li class="py-2 border-b border-white/10 flex justify-between gap-3"><span>${escapeHtml(
+              t.task
+            )}</span>${t.due ? `<span class="text-purple-300 shrink-0">${escapeHtml(t.due)}</span>` : ""}</li>`
+        )
+        .join("");
+      const copyText = items.map((t) => "- " + t.task + (t.due ? " (" + t.due + ")" : "")).join("\n");
+      showResult("Tareas y fechas", {
+        html: `<ul>${rows}</ul>`,
+        copyText,
+        icsTasks: items.filter((t) => t.due),
+      });
+    } catch (e) {
+      closeResult();
+      toast(e.message, true);
+    }
+  }
+
+  // ---------- Cuadro comparativo ----------
+  async function doTable() {
+    if (!requireTranscript()) return;
+    showResult("Cuadro comparativo", { loading: true });
+    try {
+      const d = await apiPost("/api/table", {
+        transcript: finalTranscript,
+        glossary: getGlossary(),
+      });
+      const t = d.table || {};
+      if (!t.headers || !t.headers.length) {
+        showResult("Cuadro comparativo", {
+          html: '<p class="text-slate-400">No se pudo armar el cuadro.</p>',
+        });
+        return;
+      }
+      const thead = `<tr>${t.headers
+        .map((h) => `<th class="text-left p-2 border-b border-white/20 font-semibold">${escapeHtml(h)}</th>`)
+        .join("")}</tr>`;
+      const tbody = (t.rows || [])
+        .map(
+          (r) =>
+            `<tr>${r.map((c) => `<td class="p-2 border-b border-white/10 align-top">${escapeHtml(c)}</td>`).join("")}</tr>`
+        )
+        .join("");
+      const html = `${
+        t.title ? `<p class="font-semibold mb-3">${escapeHtml(t.title)}</p>` : ""
+      }<div class="overflow-x-auto"><table class="w-full text-sm">${thead}${tbody}</table></div>`;
+      const copyText = [t.headers.join("\t"), ...(t.rows || []).map((r) => r.join("\t"))].join("\n");
+      showResult("Cuadro comparativo", { html, copyText });
+    } catch (e) {
+      closeResult();
+      toast(e.message, true);
+    }
+  }
+
+  // ---------- Cuestionario autoevaluable ----------
+  let quizData = [];
+
+  function renderQuiz() {
+    $("quiz-body").innerHTML = quizData
+      .map((q, qi) => {
+        const opts = q.options
+          .map(
+            (o, oi) =>
+              `<label class="quiz-opt flex items-center gap-2 rounded-lg px-3 py-2 cursor-pointer hover:bg-white/5" data-q="${qi}" data-o="${oi}"><input type="radio" name="q${qi}" value="${oi}" class="accent-purple-500"><span>${escapeHtml(o)}</span></label>`
+          )
+          .join("");
+        return `<div class="quiz-q" data-q="${qi}"><p class="font-medium mb-2">${qi + 1}. ${escapeHtml(
+          q.question
+        )}</p><div class="space-y-1">${opts}</div><p class="quiz-exp hidden text-xs text-slate-400 mt-2"></p></div>`;
+      })
+      .join("");
+  }
+
+  async function doQuiz() {
+    if (!requireTranscript()) return;
+    $("quiz-modal").classList.remove("hidden");
+    $("quiz-loading").classList.remove("hidden");
+    $("quiz-body").classList.add("hidden");
+    $("quiz-actions").classList.add("hidden");
+    $("quiz-score").textContent = "";
+    try {
+      const d = await apiPost("/api/quiz", {
+        transcript: finalTranscript,
+        glossary: getGlossary(),
+        count: 5,
+      });
+      quizData = d.quiz || [];
+      renderQuiz();
+      $("quiz-loading").classList.add("hidden");
+      $("quiz-body").classList.remove("hidden");
+      $("quiz-actions").classList.remove("hidden");
+      $("quiz-submit").disabled = false;
+    } catch (e) {
+      $("quiz-modal").classList.add("hidden");
+      toast(e.message, true);
+    }
+  }
+
+  function closeQuiz() {
+    $("quiz-modal").classList.add("hidden");
+  }
+  $("quiz-close").addEventListener("click", closeQuiz);
+  $("quiz-backdrop").addEventListener("click", closeQuiz);
+  $("quiz-submit").addEventListener("click", () => {
+    let score = 0;
+    quizData.forEach((q, qi) => {
+      const sel = $("quiz-body").querySelector(`input[name="q${qi}"]:checked`);
+      const chosen = sel ? parseInt(sel.value, 10) : -1;
+      if (chosen === q.correct) score++;
+      const qEl = $("quiz-body").querySelector(`.quiz-q[data-q="${qi}"]`);
+      qEl.querySelectorAll(".quiz-opt").forEach((lab) => {
+        const oi = parseInt(lab.dataset.o, 10);
+        if (oi === q.correct) lab.classList.add("bg-emerald-500/20");
+        else if (oi === chosen) lab.classList.add("bg-pink-500/20");
+      });
+      const exp = qEl.querySelector(".quiz-exp");
+      if (q.explanation) {
+        exp.textContent = "💡 " + q.explanation;
+        exp.classList.remove("hidden");
+      }
+    });
+    $("quiz-score").textContent = `Puntaje: ${score}/${quizData.length}`;
+    $("quiz-submit").disabled = true;
+  });
+
+  $("btn-polish").addEventListener("click", doPolish);
+  $("btn-tasks").addEventListener("click", doTasks);
+  $("btn-table").addEventListener("click", doTable);
+  $("btn-quiz").addEventListener("click", doQuiz);
 
   // ---------- Init ----------
   setupCollapse("tools-toggle", "tools-content", "tools-chevron");

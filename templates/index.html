@@ -215,6 +215,16 @@
         <!-- Flashcards -->
         <button id="btn-flashcards" class="grad-bg hover:opacity-90 transition rounded-xl px-3 py-2 text-sm font-medium">Flashcards</button>
 
+        <!-- Cuestionario / Cuadro / Tareas -->
+        <button id="btn-quiz" class="grad-bg hover:opacity-90 transition rounded-xl px-3 py-2 text-sm font-medium">Cuestionario</button>
+        <button id="btn-table" class="grad-bg hover:opacity-90 transition rounded-xl px-3 py-2 text-sm font-medium">Cuadro</button>
+        <button id="btn-tasks" class="grad-bg hover:opacity-90 transition rounded-xl px-3 py-2 text-sm font-medium">Tareas</button>
+
+        <span class="hidden sm:block w-px h-7 bg-white/10 mx-1"></span>
+
+        <!-- Pulir texto (modifica la transcripción) -->
+        <button id="btn-polish" class="glass hover:bg-white/10 transition rounded-xl px-3 py-2 text-sm font-medium text-slate-300">Pulir texto</button>
+
         <span class="hidden sm:block w-px h-7 bg-white/10 mx-1"></span>
 
         <!-- Glosario -->
@@ -315,9 +325,11 @@
         </div>
       </div>
       <div id="result-text" class="hidden flex-1 overflow-y-auto rounded-xl bg-black/20 p-4 text-sm leading-relaxed whitespace-pre-wrap text-slate-100"></div>
+      <div id="result-html" class="hidden flex-1 overflow-y-auto rounded-xl bg-black/20 p-4 text-sm leading-relaxed text-slate-100"></div>
       <div id="result-mermaid" class="hidden flex-1 overflow-auto rounded-xl bg-black/20 p-4 grid place-items-center"></div>
       <div class="flex gap-2 mt-4">
         <button id="result-copy" class="glass hover:bg-white/10 transition rounded-xl px-4 py-2 text-sm font-medium">Copiar</button>
+        <button id="result-ics" class="hidden grad-bg hover:opacity-90 transition rounded-xl px-4 py-2 text-sm font-medium">Exportar a calendario</button>
       </div>
     </div>
   </div>
@@ -398,6 +410,30 @@
             Fácil
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: cuestionario autoevaluable -->
+  <div id="quiz-modal" class="hidden fixed inset-0 z-50 grid place-items-center p-4">
+    <div class="absolute inset-0 bg-black/60" id="quiz-backdrop"></div>
+    <div class="glass rounded-2xl p-6 w-full max-w-2xl relative fade-in max-h-[88vh] flex flex-col">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-lg">Cuestionario</h3>
+        <button id="quiz-close" class="text-slate-400 hover:text-white transition">
+          <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div id="quiz-loading" class="hidden flex-1 grid place-items-center py-12">
+        <div class="text-center">
+          <div class="typing inline-flex"><span></span><span></span><span></span></div>
+          <p class="text-slate-400 text-sm mt-3">Generando el cuestionario...</p>
+        </div>
+      </div>
+      <div id="quiz-body" class="hidden flex-1 overflow-y-auto space-y-5 pr-1"></div>
+      <div id="quiz-actions" class="hidden mt-4 flex items-center gap-3">
+        <button id="quiz-submit" class="grad-bg hover:opacity-90 transition rounded-xl px-5 py-2.5 text-sm font-semibold">Corregir</button>
+        <span id="quiz-score" class="text-sm font-semibold"></span>
       </div>
     </div>
   </div>

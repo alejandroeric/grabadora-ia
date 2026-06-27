@@ -41,8 +41,10 @@ from validation import (
     validate_flashcards_save_input,
     validate_grade_input,
     validate_mindmap_input,
+    validate_quiz_input,
     validate_session_input,
     validate_summary_input,
+    validate_text_tool_input,
     validate_translate_input,
 )
 
@@ -213,6 +215,70 @@ def create_app(overrides=None):
         except Exception:
             return jsonify({"error": "No se pudo generar el mapa mental. Revisá la API key."}), 502
         return jsonify({"mermaid": code})
+
+    # --- Pulir el transcript ---
+    @app.post("/api/polish")
+    @require_auth
+    @rate_limit(30, 60)
+    def polish():
+        try:
+            data = validate_text_tool_input(request.get_json(silent=True))
+        except ValidationError as e:
+            return jsonify({"error": str(e)}), 400
+        try:
+            text = anthropic_client.polish_transcript(data["transcript"], glossary=data["glossary"])
+        except Exception:
+            return jsonify({"error": "No se pudo pulir el texto. Probá de nuevo."}), 502
+        return jsonify({"polished": text})
+
+    # --- Detectar tareas y fechas ---
+    @app.post("/api/tasks")
+    @require_auth
+    @rate_limit(30, 60)
+    def tasks():
+        try:
+            data = validate_text_tool_input(request.get_json(silent=True))
+        except ValidationError as e:
+            return jsonify({"error": str(e)}), 400
+        try:
+            items = anthropic_client.extract_tasks(data["transcript"], glossary=data["glossary"])
+        except Exception:
+            return jsonify({"error": "No se pudieron detectar las tareas. Probá de nuevo."}), 502
+        return jsonify({"tasks": items})
+
+    # --- Cuestionario autoevaluable ---
+    @app.post("/api/quiz")
+    @require_auth
+    @rate_limit(30, 60)
+    def quiz():
+        try:
+            data = validate_quiz_input(request.get_json(silent=True))
+        except ValidationError as e:
+            return jsonify({"error": str(e)}), 400
+        try:
+            q = anthropic_client.generate_quiz(
+                data["transcript"], data["count"], glossary=data["glossary"]
+            )
+        except Exception:
+            return jsonify({"error": "No se pudo generar el cuestionario. Probá de nuevo."}), 502
+        if not q:
+            return jsonify({"error": "La IA no devolvió preguntas válidas. Probá de nuevo."}), 502
+        return jsonify({"quiz": q})
+
+    # --- Cuadro comparativo ---
+    @app.post("/api/table")
+    @require_auth
+    @rate_limit(30, 60)
+    def table():
+        try:
+            data = validate_text_tool_input(request.get_json(silent=True))
+        except ValidationError as e:
+            return jsonify({"error": str(e)}), 400
+        try:
+            t = anthropic_client.comparison_table(data["transcript"], glossary=data["glossary"])
+        except Exception:
+            return jsonify({"error": "No se pudo generar el cuadro. Probá de nuevo."}), 502
+        return jsonify({"table": t})
 
     # --- Flashcards: generar con IA ---
     @app.post("/api/flashcards/generate")
