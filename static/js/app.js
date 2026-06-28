@@ -68,6 +68,7 @@
   const SEGMENT_MS = 10000; // largo de cada fragmento que se transcribe
   let transcriptLang = "original"; // idioma mostrado en el recuadro
   let translationCache = {}; // { español: "...", inglés: "..." }
+  let wakeLock = null; // mantiene la pantalla encendida mientras se graba
 
   function supportsRecording() {
     return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
@@ -86,6 +87,25 @@
       $("browser-warning").classList.remove("hidden");
       recordBtn.disabled = true;
       recordBtn.classList.add("opacity-40", "cursor-not-allowed");
+    }
+  }
+
+  // Mantiene la pantalla encendida mientras se graba (evita el apagado por inactividad).
+  async function acquireWakeLock() {
+    try {
+      if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen");
+    } catch {
+      /* el navegador puede negarlo; no es crítico */
+    }
+  }
+  async function releaseWakeLock() {
+    try {
+      if (wakeLock) {
+        await wakeLock.release();
+        wakeLock = null;
+      }
+    } catch {
+      wakeLock = null;
     }
   }
 
@@ -226,6 +246,7 @@
     actions.classList.add("hidden");
 
     isRecording = true;
+    acquireWakeLock();
     seconds = 0;
     timerEl.textContent = "00:00";
     timerId = setInterval(() => {
@@ -263,6 +284,7 @@
     isRecording = false;
     clearInterval(timerId);
     clearInterval(segmentTimer);
+    releaseWakeLock();
     recordBtn.classList.remove("rec-pulse");
     recordIcon.innerHTML = MIC_ICON;
     statusDot.className = "h-2.5 w-2.5 rounded-full bg-amber-400 animate-pulse";
@@ -1242,4 +1264,8 @@
   loadGlossary();
   refreshDueBadge();
   setupRecorder();
+  // El wake lock se suelta solo al cambiar de pestaña; lo re-pedimos al volver.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && isRecording) acquireWakeLock();
+  });
 })();
