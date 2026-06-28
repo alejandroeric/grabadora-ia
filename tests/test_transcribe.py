@@ -34,3 +34,14 @@ def test_transcribe_rejects_empty_audio(client):
     data = {"audio": (io.BytesIO(b""), "seg.webm")}
     res = client.post("/api/transcribe", data=data, content_type="multipart/form-data")
     assert res.status_code == 400
+
+
+def test_oversized_request_returns_413(tmp_path):
+    from app import create_app
+
+    app = create_app({"DATABASE_PATH": str(tmp_path / "big.db"), "MAX_CONTENT_LENGTH": 50})
+    c = app.test_client()
+    data = {"audio": (io.BytesIO(b"x" * 500), "seg.webm")}
+    res = c.post("/api/transcribe", data=data, content_type="multipart/form-data")
+    assert res.status_code == 413
+    assert "error" in res.get_json()

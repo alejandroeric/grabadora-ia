@@ -47,3 +47,16 @@ def test_login_then_access_granted(auth_client, monkeypatch):
 def test_auth_disabled_allows_open_access(client):
     """Sin APP_PASSWORD (fixture client por defecto), la app queda abierta."""
     assert client.get("/").status_code == 200
+
+
+def test_rate_limiter_prunes_stale_keys():
+    """El rate-limiter borra entradas viejas para no crecer infinito."""
+    import time
+
+    import security
+
+    security._hits.clear()
+    security._last_prune = 0.0
+    security._hits["vieja:1.2.3.4"].append(time.time() - 1000)  # entrada vencida
+    security._maybe_prune(time.time())
+    assert "vieja:1.2.3.4" not in security._hits

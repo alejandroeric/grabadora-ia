@@ -31,6 +31,9 @@ class Config:
     # audio que está en otro idioma.
     TRANSCRIBE_LANG = os.environ.get("TRANSCRIBE_LANG", "")
     MAX_AUDIO_BYTES = 25 * 1024 * 1024
+    # Flask rechaza cualquier request más grande que esto ANTES de leerlo a
+    # memoria (un poco más que MAX_AUDIO_BYTES para dejar margen al multipart).
+    MAX_CONTENT_LENGTH = 26 * 1024 * 1024
 
     # --- Base de datos ---
     # Si DATABASE_URL apunta a Postgres (Neon en prod), se usa Postgres.

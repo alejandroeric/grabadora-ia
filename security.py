@@ -13,6 +13,20 @@ from flask import current_app, jsonify, redirect, request, session, url_for
 
 # ---------- Rate limiter en memoria ----------
 _hits = defaultdict(deque)
+_last_prune = 0.0
+PRUNE_INTERVAL = 300  # cada cuánto barremos entradas viejas (seg)
+PRUNE_MAX_AGE = 600  # entradas sin actividad hace más de esto se descartan
+
+
+def _maybe_prune(now):
+    """Borra periódicamente las entradas viejas para que _hits no crezca infinito."""
+    global _last_prune
+    if now - _last_prune < PRUNE_INTERVAL:
+        return
+    _last_prune = now
+    stale = [k for k, dq in list(_hits.items()) if not dq or dq[-1] <= now - PRUNE_MAX_AGE]
+    for k in stale:
+        del _hits[k]
 
 
 def _client_ip():
@@ -29,6 +43,7 @@ def rate_limit(max_calls, per_seconds):
         def wrapper(*args, **kwargs):
             key = f"{fn.__name__}:{_client_ip()}"
             now = time.time()
+            _maybe_prune(now)
             dq = _hits[key]
             while dq and dq[0] <= now - per_seconds:
                 dq.popleft()

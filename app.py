@@ -61,6 +61,11 @@ def create_app(overrides=None):
     def db_path():
         return app.config["DATABASE_PATH"]
 
+    # Request demasiado grande (supera MAX_CONTENT_LENGTH) -> JSON, no HTML.
+    @app.errorhandler(413)
+    def too_large(_e):
+        return jsonify({"error": "El archivo es demasiado grande."}), 413
+
     # --- Login / logout ---
     @app.get("/login")
     def login():
